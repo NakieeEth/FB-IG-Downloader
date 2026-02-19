@@ -31,10 +31,10 @@ let pollTimer = null;
 // Download mode: "auto" (default), "zip", "files"
 const MODE_KEY = "sid_dl_mode";
 const MODES = ["auto", "zip", "files"];
-const ZIP_THRESHOLD = 50; // ✅ auto-switch to ZIP when >= 50
+const ZIP_THRESHOLD = 50; // auto-switch to ZIP when >= 50
 let dlMode = "auto";
 
-// ✅ UPDATED verify limit
+// ✅ Preview verification limit
 const MAX_VERIFY = 1000;
 
 function toast(msg){
@@ -270,6 +270,16 @@ async function buildPreview(){
   setStatus("Building preview from captured URLs…");
   renderSkeletons();
 
+  await ensureContent(tab.id);
+
+  // ✅ Instagram multi-photo (carousel) scan:
+  // It will click "Next" up to 30 times (only if a post/modal carousel is open)
+  if (site === "Instagram") {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: "IG_CAROUSEL_SCAN", tabId: tab.id, steps: 30, delayMs: 650 });
+    } catch {}
+  }
+
   const cap = await chrome.runtime.sendMessage({ type:"CAPTURE_GET", tabId: tab.id });
   const urls = cap?.urls || [];
   capCountEl.textContent = String(urls.length);
@@ -281,8 +291,6 @@ async function buildPreview(){
     toast("No captured URLs");
     return;
   }
-
-  await ensureContent(tab.id);
 
   const res = await chrome.tabs.sendMessage(tab.id, {
     type: "VERIFY_CAPTURED_URLS",
@@ -391,7 +399,6 @@ async function buildZipFromUrls(urls, folderName){
     const name = `${folder}/img_${String(i+1).padStart(5,"0")}.${ext}`;
     const data = await fetchAsBytes(url);
     files.push({ name, data });
-
     if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
   }
 
@@ -525,7 +532,6 @@ async function init(){
 
   const site = normalizeSite(tab.url);
   siteNameEl.textContent = site;
-  siteDotEl.style.background = "rgba(255,255,255,.22)";
 
   setLiveUi(false);
   await loadMode();
