@@ -4,8 +4,8 @@
   window.__SID_CONTENT_LOADED__ = true;
 
   // ✅ UPDATED LIMITS
-  const MIN_W = 10;
-  const MIN_H = 10;
+  const MIN_W = 300;
+  const MIN_H = 300;
 
   function toAbs(url) {
     try { return new URL(url, location.href).href; } catch { return null; }
