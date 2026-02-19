@@ -1,5 +1,5 @@
-const MIN_W = 200;
-const MIN_H = 200;
+const MIN_W = 400;
+const MIN_H = 400;
 
 function toAbs(url) {
   try { return new URL(url, location.href).href; } catch { return null; }
@@ -45,30 +45,92 @@ function extractCssBackgroundUrlsFast(limit = 900) {
 
 function collectUrlsFast() {
   const urls = [];
-
   document.querySelectorAll("img").forEach(img => {
     const u = img.currentSrc || img.getAttribute("src");
     const abs = u ? toAbs(u) : null;
     if (abs && looksLikeImage(abs)) urls.push(abs);
   });
-
   extractCssBackgroundUrlsFast(900).forEach(u => urls.push(u));
-
   return Array.from(new Set(urls));
+}
+
+// ===== Floating LIVE badge (page overlay) =====
+const BADGE_ID = "__sid_live_badge__";
+
+function ensureBadge() {
+  let el = document.getElementById(BADGE_ID);
+  if (el) return el;
+
+  el = document.createElement("div");
+  el.id = BADGE_ID;
+  el.style.cssText = `
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 2147483647;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(12px);
+    color: rgba(255,255,255,.92);
+    font: 600 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    display: none;
+    align-items: center;
+    gap: 10px;
+    user-select:none;
+  `;
+
+  const dot = document.createElement("div");
+  dot.style.cssText = `
+    width:10px; height:10px; border-radius:999px;
+    background: #2fe08a;
+    box-shadow: 0 0 0 6px rgba(47,224,138,.14);
+    animation: __sid_pulse 1.2s ease-in-out infinite;
+  `;
+
+  const text = document.createElement("div");
+  text.innerHTML = `<div style="font-weight:900; letter-spacing:.2px">LIVE CAPTURE</div>
+                    <div style="opacity:.65; font-weight:700; font-size:11px; margin-top:1px" id="__sid_badge_count">capturing…</div>`;
+
+  el.appendChild(dot);
+  el.appendChild(text);
+
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes __sid_pulse { 0%,100%{ transform:scale(1); opacity:.82 } 50%{ transform:scale(1.15); opacity:1 } }
+  `;
+  document.documentElement.appendChild(style);
+  document.documentElement.appendChild(el);
+  return el;
+}
+
+function showBadge(on) {
+  const el = ensureBadge();
+  el.style.display = on ? "flex" : "none";
+}
+
+function setBadgeCount(n) {
+  const el = document.getElementById("__sid_badge_count");
+  if (el) el.textContent = `${n} urls captured`;
 }
 
 // ===== Live capture engine =====
 const LIVE_KEY = "__sid_live_capture_state__";
-
 function liveState() {
-  if (!window[LIVE_KEY]) window[LIVE_KEY] = { on: false, obs: null, timer: null, lastSent: 0, tabId: null };
+  if (!window[LIVE_KEY]) window[LIVE_KEY] = { on:false, obs:null, timer:null, lastSent:0, tabId:null, lastCount:0 };
   return window[LIVE_KEY];
 }
 
 async function sendCapturedBatch(tabId) {
   const urls = collectUrlsFast();
   if (!urls.length) return;
-  await chrome.runtime.sendMessage({ type: "CAPTURE_ADD", tabId, urls });
+  const res = await chrome.runtime.sendMessage({ type: "CAPTURE_ADD", tabId, urls });
+  const count = res?.count ?? urls.length;
+  const st = liveState();
+  st.lastCount = count;
+  setBadgeCount(count);
 }
 
 function startLive(tabId) {
@@ -76,6 +138,7 @@ function startLive(tabId) {
   if (st.on) return;
   st.on = true;
   st.tabId = tabId;
+  showBadge(true);
 
   st.obs = new MutationObserver(() => {
     const now = Date.now();
@@ -106,9 +169,10 @@ function stopLive() {
   st.obs = null;
   if (st.timer) { try { clearInterval(st.timer); } catch {} }
   st.timer = null;
+  showBadge(false);
 }
 
-// ===== Verify captured URLs into preview items (>=200×200) =====
+// ===== Verify captured URLs into preview items (>= MIN) =====
 function measureUrl(url) {
   return new Promise(resolve => {
     const img = new Image();
@@ -130,10 +194,9 @@ function dedupeItems(items) {
   return out;
 }
 
-async function verifyCapturedStrict(urls, maxVerify = 220) {
+async function verifyCapturedStrict(urls, maxVerify = 260) {
   const unique = Array.from(new Set(urls)).slice(0, 3000);
 
-  // fast path: check current DOM images for known sizes
   const domMap = new Map();
   document.querySelectorAll("img").forEach(img => {
     const url = toAbs(img.currentSrc || img.getAttribute("src"));
@@ -193,7 +256,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (t === "VERIFY_CAPTURED_URLS") {
     (async () => {
       const urls = Array.isArray(msg.urls) ? msg.urls : [];
-      const res = await verifyCapturedStrict(urls, Number(msg.maxVerify ?? 220));
+      const res = await verifyCapturedStrict(urls, Number(msg.maxVerify ?? 260));
       sendResponse(res);
     })();
     return true;
