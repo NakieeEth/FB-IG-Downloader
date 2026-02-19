@@ -31,7 +31,7 @@ let pollTimer = null;
 // Download mode: "auto" (default), "zip", "files"
 const MODE_KEY = "sid_dl_mode";
 const MODES = ["auto", "zip", "files"];
-const ZIP_THRESHOLD = 90; // auto-switch to ZIP when downloading >= this many
+const ZIP_THRESHOLD = 50; // ✅ auto-switch to ZIP when >= 50
 let dlMode = "auto";
 
 function toast(msg){
@@ -39,7 +39,6 @@ function toast(msg){
   toastEl.classList.add("show");
   setTimeout(() => toastEl.classList.remove("show"), 1200);
 }
-
 function setStatus(msg){ statusEl.textContent = msg; }
 
 function modeLabel(m){
@@ -85,9 +84,7 @@ async function ensureContent(tabId){
   try{
     const res = await chrome.tabs.sendMessage(tabId, { type: "PING" });
     if (res?.ok) return;
-  }catch{
-    // content not injected yet
-  }
+  }catch{}
   await chrome.scripting.executeScript({ target:{ tabId }, files:["content.js"] });
 }
 
@@ -315,32 +312,208 @@ async function clearCaptured(){
   toast("Cleared");
 }
 
+/* =========================
+   ZIP builder in POPUP
+   ========================= */
+
+function u16(n){ const a=new Uint8Array(2); a[0]=n&255; a[1]=(n>>>8)&255; return a; }
+function u32(n){ const a=new Uint8Array(4); a[0]=n&255; a[1]=(n>>>8)&255; a[2]=(n>>>16)&255; a[3]=(n>>>24)&255; return a; }
+
+function concatBytes(parts){
+  let total=0; for(const p of parts) total+=p.byteLength;
+  const out=new Uint8Array(total);
+  let off=0;
+  for(const p of parts){ out.set(p, off); off+=p.byteLength; }
+  return out;
+}
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i=0;i<256;i++){
+    let c=i;
+    for(let k=0;k<8;k++) c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);
+    table[i]=c>>>0;
+  }
+  return table;
+})();
+
+function crc32(buf){
+  let c=0xffffffff;
+  for(let i=0;i<buf.length;i++) c = CRC_TABLE[(c^buf[i])&255] ^ (c>>>8);
+  return (c^0xffffffff)>>>0;
+}
+
+function encodeUtf8(s){ return new TextEncoder().encode(s); }
+
+function dosTimeDate(date=new Date()){
+  const d=date;
+  const time=((d.getHours()&31)<<11)|((d.getMinutes()&63)<<5)|((Math.floor(d.getSeconds()/2)&31));
+  const year=d.getFullYear();
+  const datePart=(((year-1980)&127)<<9)|(((d.getMonth()+1)&15)<<5)|(d.getDate()&31);
+  return { time, date: datePart };
+}
+
+function sanitizeName(name) {
+  return (name || "images")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function guessExt(url) {
+  try {
+    const p = new URL(url).pathname.toLowerCase();
+    if (p.includes(".jpeg") || p.includes(".jpg")) return "jpg";
+    if (p.includes(".png")) return "png";
+    if (p.includes(".webp")) return "webp";
+  } catch {}
+  return "jpg";
+}
+
+async function fetchAsBytes(url){
+  const res = await fetch(url, { credentials:"omit", cache:"no-store" });
+  if(!res.ok) throw new Error(`Fetch failed (${res.status})`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+async function buildZipFromUrls(urls, folderName){
+  const unique = Array.from(new Set(urls));
+  const folder = sanitizeName(folderName);
+
+  const files = [];
+  for (let i=0;i<unique.length;i++){
+    const url = unique[i];
+    const ext = guessExt(url);
+    const name = `${folder}/img_${String(i+1).padStart(4,"0")}.${ext}`;
+    const data = await fetchAsBytes(url);
+    files.push({ name, data });
+
+    // Yield a bit to keep UI responsive
+    if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  const now = dosTimeDate(new Date());
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for(const f of files){
+    const nameBytes = encodeUtf8(f.name);
+    const crc = crc32(f.data);
+    const size = f.data.byteLength;
+
+    const localHeader = concatBytes([
+      u32(0x04034b50),
+      u16(20),
+      u16(0),
+      u16(0),              // STORE (no compression)
+      u16(now.time),
+      u16(now.date),
+      u32(crc),
+      u32(size),
+      u32(size),
+      u16(nameBytes.byteLength),
+      u16(0),
+      nameBytes
+    ]);
+
+    localParts.push(localHeader);
+    localParts.push(f.data);
+
+    const centralHeader = concatBytes([
+      u32(0x02014b50),
+      u16(0x031e),
+      u16(20),
+      u16(0),
+      u16(0),
+      u16(now.time),
+      u16(now.date),
+      u32(crc),
+      u32(size),
+      u32(size),
+      u16(nameBytes.byteLength),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(0),
+      u32(offset),
+      nameBytes
+    ]);
+
+    centralParts.push(centralHeader);
+    offset += localHeader.byteLength + f.data.byteLength;
+  }
+
+  const centralDir = concatBytes(centralParts);
+  const eocd = concatBytes([
+    u32(0x06054b50),
+    u16(0), u16(0),
+    u16(files.length), u16(files.length),
+    u32(centralDir.byteLength),
+    u32(offset),
+    u16(0)
+  ]);
+
+  return concatBytes([...localParts, centralDir, eocd]);
+}
+
+async function inferZipNameFromTab(tab){
+  const site = normalizeSite(tab.url);
+  return sanitizeName(site || "images");
+}
+
+async function downloadZip(urls){
+  const tab = tabCache || await getActiveTab();
+  const base = await inferZipNameFromTab(tab);
+  const zipFilename = `${base}.zip`;
+
+  setStatus(`Building ZIP (${urls.length} files)…`);
+
+  const zipBytes = await buildZipFromUrls(urls, base);
+  const blob = new Blob([zipBytes], { type:"application/zip" });
+
+  const blobUrl = URL.createObjectURL(blob);
+  try{
+    await chrome.downloads.download({
+      url: blobUrl,
+      filename: zipFilename,
+      conflictAction: "uniquify",
+      saveAs: false
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+  }
+
+  setStatus(`ZIP download started — ${urls.length} files.`);
+  toast(`ZIP: ${urls.length} files`);
+}
+
 async function download(urls){
   if (!urls.length){
     toast("Nothing selected");
     return;
   }
-  const tab = tabCache || await getActiveTab();
 
+  const tab = tabCache || await getActiveTab();
   const useZip = (dlMode === "zip") || (dlMode === "auto" && urls.length >= ZIP_THRESHOLD);
 
   if (useZip){
-    setStatus(`Preparing ZIP (${urls.length} files)…`);
-    const res = await chrome.runtime.sendMessage({ type:"DOWNLOAD_ZIP", tabId: tab.id, urls });
-    const n = res?.count ?? urls.length;
-    setStatus(`ZIP download started — ${n} files.`);
-    toast(`ZIP: ${n} files`);
+    await downloadZip(urls);
+    return;
+  }
+
+  setStatus(`Starting ${urls.length} downloads…`);
+  const res = await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
+  const n = res?.count ?? urls.length;
+
+  if (res?.capped){
+    setStatus(`Started ${n} downloads (capped).`);
+    toast(`Downloaded ${n} (cap)`);
   } else {
-    setStatus(`Starting ${urls.length} downloads…`);
-    const res = await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
-    const n = res?.count ?? urls.length;
-    if (res?.capped) {
-      setStatus(`Started ${n} downloads (capped).`);
-      toast(`Downloaded ${n} (cap)`);
-    } else {
-      setStatus(`Started ${n} downloads.`);
-      toast(`Downloading ${n}`);
-    }
+    setStatus(`Started ${n} downloads.`);
+    toast(`Downloading ${n}`);
   }
 }
 
