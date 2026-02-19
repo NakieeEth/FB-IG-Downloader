@@ -86,7 +86,6 @@
     button:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); box-shadow: 0 14px 30px rgba(0,0,0,.32); }
     button:active{ transform: translateY(1px) scale(.995); }
     button.primary{ background: linear-gradient(135deg, rgba(90,167,255,.30), rgba(124,92,255,.18)); border-color: rgba(90,167,255,.28); }
-    button.icon{ width:38px; padding: 9px 0; text-align:center; font-weight: 1000; }
 
     .statusRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:2px; }
     .status{ font-size: 12px; color: var(--muted); white-space:nowrap; overflow:hidden; text-overflow: ellipsis; }
@@ -117,7 +116,6 @@
     .meta{ position:absolute; left:8px; right:8px; bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; pointer-events:none; }
     .badge{ font-size: 10px; padding: 4px 7px; border-radius: 999px; border:1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.40); color: rgba(255,255,255,.88); backdrop-filter: blur(8px); white-space:nowrap; }
     .check{ pointer-events:auto; position:absolute; top:8px; left:8px; width:18px; height:18px; accent-color: var(--accent); filter: drop-shadow(0 3px 10px rgba(0,0,0,.45)); }
-
     .selGlow{ position:absolute; inset:-2px; border-radius: 20px; border: 2px solid rgba(90,167,255,.0); box-shadow: 0 0 0 rgba(0,0,0,0); transition: border-color .18s ease, box-shadow .18s ease; pointer-events:none; }
     .card.selected .selGlow{ border-color: rgba(90,167,255,.70); box-shadow: 0 0 0 6px rgba(90,167,255,.14); }
 
@@ -150,7 +148,7 @@
         <div class="logo"></div>
         <div class="titleWrap">
           <div class="title">Social Image Downloader</div>
-          <div class="subtitle" id="subtitle">FB/IG • JPG/PNG/WEBP • skip &lt;200×200</div>
+          <div class="subtitle" id="subtitle">Live capture • JPG/PNG/WEBP • skip &lt;200×200</div>
         </div>
       </div>
       <div class="chip" id="siteChip"><strong>—</strong></div>
@@ -162,18 +160,16 @@
           <div class="searchIcon">⌕</div>
           <input id="search" type="text" placeholder="Filter by URL (optional)..." />
         </div>
-        <button class="icon" id="refresh" title="Refresh">↻</button>
       </div>
 
       <div class="btnRow">
         <button id="liveStart">Live ON</button>
         <button id="liveStop">Live OFF</button>
-        <button id="capturedPreview">Build Preview (Captured)</button>
+        <button class="primary" id="capturedPreview">Build Preview (Captured)</button>
         <button id="capturedClear">Clear Captured</button>
       </div>
 
       <div class="btnRow">
-        <button id="smartScrollScan">Smart scroll + scan</button>
         <button id="selectAll">Select all</button>
         <button id="selectNone">Select none</button>
         <button class="primary" id="downloadSelected">Download selected</button>
@@ -181,7 +177,7 @@
       </div>
 
       <div class="statusRow">
-        <div class="status" id="statusText">Ready.</div>
+        <div class="status" id="statusText">Live mode ready. Press Live ON and scroll.</div>
         <div class="counter" title="Shown / Selected">
           <span class="dot"></span>
           <span id="countPill">0</span>
@@ -201,7 +197,7 @@
     </div>
 
     <div class="note">
-      ✅ Best method on FB/IG: press <b>Live ON</b>, scroll normally (it captures in background), then press <b>Build Preview (Captured)</b>.
+      Workflow: <b>Live ON</b> → scroll the profile/feed → <b>Build Preview (Captured)</b> → download.
     </div>
   </main>
 
