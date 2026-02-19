@@ -10,7 +10,6 @@ function inferFolderFromTitle(url, title) {
   const host = (() => { try { return new URL(url).hostname; } catch { return ""; } })();
   let base = title || "images";
 
-  // Facebook title patterns: "Name | Facebook", "Page Name - Home | Facebook"
   if (host.includes("facebook.com")) {
     base = base.replace(/\s*\|\s*Facebook\s*$/i, "");
     base = base.replace(/\s*-\s*Home\s*$/i, "");
@@ -18,7 +17,6 @@ function inferFolderFromTitle(url, title) {
     if (!base) base = "Facebook";
   }
 
-  // Instagram patterns: "Name (@user) • Instagram photos and videos"
   if (host.includes("instagram.com")) {
     base = base.replace(/\s*•\s*Instagram.*$/i, "").trim();
     if (!base) base = "Instagram";
@@ -29,14 +27,12 @@ function inferFolderFromTitle(url, title) {
 
 function guessExt(url) {
   try {
-    const u = new URL(url);
-    const p = u.pathname.toLowerCase();
-    if (p.includes(".jpg") || p.includes(".jpeg")) return "jpg";
+    const p = new URL(url).pathname.toLowerCase();
+    if (p.includes(".jpeg") || p.includes(".jpg")) return "jpg";
     if (p.includes(".png")) return "png";
     if (p.includes(".webp")) return "webp";
   } catch {}
-  // Many FB/IG URLs have no extension; default to jpg
-  return "jpg";
+  return "jpg"; // FB/IG often no extension
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -44,9 +40,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   (async () => {
     const urls = msg.urls || [];
-    const tabId = msg.tabId;
-
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await chrome.tabs.get(msg.tabId);
     const folder = inferFolderFromTitle(tab.url, tab.title);
 
     for (let i = 0; i < urls.length; i++) {
@@ -67,4 +61,3 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   return true;
 });
-
