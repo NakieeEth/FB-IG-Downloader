@@ -208,7 +208,7 @@ async function smartScrollThenScan(){
   const res = await chrome.tabs.sendMessage(tab.id, {
     type: "SMART_SCROLL_AND_COLLECT",
     stepPx: 950,
-    delayMs: 700,
+    delayMs: 900,
     maxScrolls: 70,
     settleRounds: 4
   });
