@@ -7,18 +7,12 @@
     :root{
       --bg0:#05070e;
       --bg1:#0a0f1f;
-      --glass:rgba(255,255,255,.06);
-      --glass2:rgba(255,255,255,.035);
-      --border:rgba(255,255,255,.10);
       --border2:rgba(255,255,255,.07);
       --text:rgba(255,255,255,.92);
       --muted:rgba(255,255,255,.64);
       --muted2:rgba(255,255,255,.45);
       --shadow: 0 14px 40px rgba(0,0,0,.55);
       --accent:#5aa7ff;
-      --accent2:#7c5cff;
-      --ok:#2fe08a;
-      --danger:#ff5b72;
       --r:16px;
     }
 
@@ -35,7 +29,6 @@
         linear-gradient(180deg, var(--bg1), var(--bg0));
     }
 
-    /* Animations */
     @keyframes popIn {
       from { opacity:0; transform: translateY(8px) scale(.985); }
       to   { opacity:1; transform: translateY(0) scale(1); }
@@ -45,7 +38,6 @@
       100% { background-position: 200% 0; }
     }
 
-    /* Header */
     header{
       position: sticky;
       top:0;
@@ -118,7 +110,6 @@
     }
     .chip strong{ color: var(--text); }
 
-    /* Controls */
     .controls{ display:grid; gap:8px; }
 
     .searchRow{
@@ -224,16 +215,14 @@
       box-shadow: 0 0 0 3px rgba(255,255,255,.06);
     }
 
-    /* Main */
     main{ padding: 12px; }
 
     .grid{
       display:grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 10px;
     }
 
-    /* Card */
     .card{
       position:relative;
       border-radius: 18px;
@@ -328,7 +317,6 @@
       box-shadow: 0 0 0 6px rgba(90,167,255,.14);
     }
 
-    /* Skeleton */
     .skeleton{
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,.10);
@@ -352,7 +340,6 @@
       animation: shimmer 1.1s linear infinite;
     }
 
-    /* Footer */
     .footer{
       display:flex;
       gap:8px;
@@ -406,12 +393,11 @@
       </div>
 
       <div class="btnRow">
+        <button id="smartScrollScan">Smart scroll + scan</button>
         <button id="selectAll">Select all</button>
         <button id="selectNone">Select none</button>
         <button class="primary" id="downloadSelected">Download selected</button>
         <button id="downloadAll">Download all</button>
-        <button id="autoScrollScan">Auto-scroll ×10 + scan</button>
-
       </div>
 
       <div class="statusRow">
@@ -435,8 +421,8 @@
     </div>
 
     <div class="note">
-      Tip: FB/IG load content dynamically. Scroll to load more images, then hit refresh ↻.
-      (Some images may still be blocked by the site.)
+      Tip: Open a profile/feed, then use <b>Smart scroll + scan</b> to load more posts until it stops.
+      Right-click an image tile to open it in a new tab.
     </div>
   </main>
 
