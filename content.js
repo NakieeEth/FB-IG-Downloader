@@ -1,5 +1,5 @@
-const MIN_W = 200;
-const MIN_H = 200;
+const MIN_W = 400;
+const MIN_H = 400;
 
 function toAbs(url) {
   try { return new URL(url, location.href).href; } catch { return null; }
