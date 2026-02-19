@@ -199,7 +199,7 @@
     return out;
   }
 
-  async function verifyCapturedStrict(urls, maxVerify = 260) {
+  async function verifyCapturedStrict(urls, maxVerify = 1000) {
     const unique = Array.from(new Set(urls)).slice(0, 3000);
 
     const domMap = new Map();
