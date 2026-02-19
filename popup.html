@@ -1,45 +1,215 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <style>
-      body { font-family: Arial, sans-serif; width: 380px; padding: 10px; }
-      button { padding: 8px 10px; cursor: pointer; }
-      .row { display:flex; gap:8px; margin-bottom:10px; flex-wrap: wrap; }
-      #status { font-size: 12px; opacity: 0.85; margin: 6px 0 10px; }
-      #list { max-height: 420px; overflow:auto; border:1px solid #ddd; border-radius:8px; padding:8px; }
-      .item { display:flex; gap:10px; align-items:center; padding:6px; border-bottom:1px solid #eee; }
-      .item:last-child { border-bottom: none; }
-      .thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border:1px solid #eee; background:#f6f6f6; }
-      .meta { flex:1; }
-      .url { font-size: 11px; opacity: 0.8; word-break: break-all; }
-      .dim { font-size: 12px; opacity: 0.9; margin-top: 2px; }
-      .topline { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-      .small { font-size: 11px; opacity: 0.75; margin-top: 8px; }
-      input[type="checkbox"]{ transform: scale(1.1); }
-    </style>
-  </head>
-  <body>
-    <div class="topline">
-      <strong>FB/IG Image Downloader</strong>
-      <button id="refresh">Refresh</button>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b0f19;
+      --panel:#121a2b;
+      --card:#0f1626;
+      --border:rgba(255,255,255,.08);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.65);
+      --muted2:rgba(255,255,255,.45);
+      --accent:#5aa7ff;
+      --accent2:#7c5cff;
+      --danger:#ff5a6f;
+      --ok:#35d07f;
+      --radius:14px;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      width:420px;
+      background:linear-gradient(180deg,#0b0f19,#070a11);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+    header{
+      padding:12px 12px 10px;
+      position:sticky; top:0;
+      background:linear-gradient(180deg,#0b0f19 50%, rgba(11,15,25,.75));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--border);
+      z-index:10;
+    }
+    .title{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .title strong{
+      font-size:14px; letter-spacing:.2px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .pill{
+      font-size:11px;
+      padding:4px 8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      color:var(--muted);
+      background:rgba(255,255,255,.03);
+    }
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:8px;
+    }
+    .row{
+      display:flex; gap:8px; flex-wrap:wrap;
+    }
+    input[type="text"]{
+      width:100%;
+      padding:9px 10px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.03);
+      color:var(--text);
+      outline:none;
+    }
+    input[type="text"]::placeholder{ color:var(--muted2); }
+    button{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      padding:9px 10px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:12px;
+      transition: transform .05s ease, background .15s ease, border .15s ease;
+    }
+    button:hover{ background:rgba(255,255,255,.07); }
+    button:active{ transform: translateY(1px); }
+    button.primary{
+      background:linear-gradient(135deg, rgba(90,167,255,.22), rgba(124,92,255,.18));
+      border-color:rgba(90,167,255,.35);
+    }
+    button.primary:hover{
+      background:linear-gradient(135deg, rgba(90,167,255,.28), rgba(124,92,255,.22));
+    }
+    button.danger{
+      border-color:rgba(255,90,111,.35);
+      background:rgba(255,90,111,.10);
+    }
+    #status{
+      margin-top:8px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex; align-items:center; justify-content:space-between;
+      gap:8px;
+    }
+    .hint{
+      font-size:11px;
+      color:var(--muted2);
+      padding:10px 12px;
+    }
+    main{
+      padding:12px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+    }
+    .card{
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      overflow:hidden;
+      position:relative;
+    }
+    .thumbWrap{
+      aspect-ratio:1/1;
+      background:rgba(255,255,255,.03);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .thumb{
+      width:100%; height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .meta{
+      padding:8px 9px 9px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:8px;
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .dim{
+      font-size:11px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .chk{
+      position:absolute;
+      top:8px; left:8px;
+      width:18px; height:18px;
+      accent-color: var(--accent);
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+    }
+    .badge{
+      position:absolute;
+      bottom:8px; right:8px;
+      font-size:10px;
+      padding:3px 6px;
+      border-radius:999px;
+      background:rgba(0,0,0,.45);
+      border:1px solid rgba(255,255,255,.12);
+      color:rgba(255,255,255,.85);
+      backdrop-filter: blur(6px);
+    }
+    .empty{
+      padding:18px 12px;
+      border:1px dashed var(--border);
+      border-radius:var(--radius);
+      color:var(--muted);
+      text-align:center;
+      background:rgba(255,255,255,.02);
+    }
+    .footerRow{
+      display:flex;
+      gap:8px;
+      margin-top:12px;
+    }
+    .footerRow button{ flex:1; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">
+      <strong>📥 Social Image Downloader</strong>
+      <span class="pill" id="domainPill">FB/IG</span>
     </div>
 
-    <div class="row">
-      <button id="selectAll">Select all</button>
-      <button id="selectNone">Select none</button>
-      <button id="downloadSelected">Download selected</button>
+    <div class="controls">
+      <input id="search" type="text" placeholder="Filter by URL (optional)..." />
+      <div class="row">
+        <button id="refresh">Refresh</button>
+        <button id="selectAll">Select all</button>
+        <button id="selectNone">Select none</button>
+      </div>
+      <div id="status">
+        <span id="statusText">Ready.</span>
+        <span class="pill" id="countPill">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="list" class="grid"></div>
+
+    <div class="footerRow">
+      <button class="primary" id="downloadSelected">Download selected</button>
       <button id="downloadAll">Download all</button>
     </div>
 
-    <div id="status">Ready.</div>
-    <div id="list"></div>
-
-    <div class="small">
-      Notes: FB/IG load content dynamically. Scroll the page to load more images, then click Refresh.
+    <div class="hint">
+      Scroll FB/IG to load more images, then press <b>Refresh</b>. Filters: JPG/PNG/WEBP, skip &lt;200×200.
     </div>
+  </main>
 
-    <script src="popup.js"></script>
-  </body>
+  <script src="popup.js"></script>
+</body>
 </html>
-
