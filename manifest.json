@@ -4,7 +4,13 @@
   "version": "1.3.1",
   "description": "Beautiful gallery + Live Capture Mode for FB/IG images (JPG/PNG/WEBP, skip <200x200).",
   "permissions": ["downloads", "tabs", "scripting", "activeTab", "storage"],
-  "host_permissions": ["https://*.facebook.com/*", "https://*.instagram.com/*"],
+  "host_permissions": [
+    "https://*.facebook.com/*",
+    "https://*.instagram.com/*",
+    "https://*.fbcdn.net/*",
+    "https://*.cdninstagram.com/*",
+    "https://*.igcdn.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Social Image Downloader"
