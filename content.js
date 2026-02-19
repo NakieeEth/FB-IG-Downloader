@@ -79,7 +79,7 @@ function countVisibleImageCandidates() {
 async function smartScroll({
   stepPx = 950,
   delayMs = 700,
-  maxScrolls = 70,
+  maxScrolls = 120,
   settleRounds = 4
 } = {}) {
   let noNewRounds = 0;
