@@ -31,7 +31,7 @@
       radial-gradient(700px 420px at 92% 16%, rgba(124,92,255,.18), transparent 58%),
       radial-gradient(600px 420px at 50% 120%, rgba(47,224,138,.12), transparent 60%),
       linear-gradient(180deg, var(--bg1), var(--bg0));
-    overflow:auto;
+    overflow:hidden;
   }
 
   @keyframes popIn { from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:translateY(0) scale(1)} }
@@ -105,6 +105,25 @@
     gap:8px;
   }
 
+  /* Tiny mode toggle button that matches chips */
+  .chipBtn{
+    appearance:none;
+    border:1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    color: var(--muted);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    box-shadow: none;
+    font-weight: 900;
+  }
+  .chipBtn:hover{ background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); }
+  .chipBtn:active{ transform: translateY(1px); }
+
   .dot{
     width:8px;height:8px;border-radius:999px;
     background: rgba(255,255,255,.22);
@@ -157,10 +176,10 @@
   }
 
   main{
-  padding: 12px;
-  overflow:auto;
-}
-
+    padding: 12px;
+    max-height: 520px;
+    overflow:auto;
+  }
   main::-webkit-scrollbar{ width: 10px; }
   main::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.10); border-radius: 999px; border:2px solid rgba(0,0,0,0); background-clip: padding-box; }
   main::-webkit-scrollbar-track{ background: rgba(255,255,255,.03); }
@@ -355,6 +374,11 @@
         <span class="dot" id="liveDot"></span>
         <span><strong id="capCount">0</strong> captured</span>
       </div>
+
+      <button class="chipBtn" id="modeToggle" title="Download mode (Auto/ZIP/Files)">
+        <span class="dot" style="opacity:.55"></span>
+        <span id="modeLabel">Mode: Auto</span>
+      </button>
     </div>
   </div>
 
