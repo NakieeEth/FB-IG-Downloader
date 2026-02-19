@@ -31,7 +31,7 @@
       radial-gradient(700px 420px at 92% 16%, rgba(124,92,255,.18), transparent 58%),
       radial-gradient(600px 420px at 50% 120%, rgba(47,224,138,.12), transparent 60%),
       linear-gradient(180deg, var(--bg1), var(--bg0));
-    overflow:hidden;
+    overflow:auto;
   }
 
   @keyframes popIn { from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:translateY(0) scale(1)} }
@@ -157,10 +157,10 @@
   }
 
   main{
-    padding: 12px;
-    height: 520px;
-    overflow:auto;
-  }
+  padding: 12px;
+  overflow:auto;
+}
+
   main::-webkit-scrollbar{ width: 10px; }
   main::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.10); border-radius: 999px; border:2px solid rgba(0,0,0,0); background-clip: padding-box; }
   main::-webkit-scrollbar-track{ background: rgba(255,255,255,.03); }
