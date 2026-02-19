@@ -1,3 +1,4 @@
+// popup.js
 const listEl = document.getElementById("list");
 const statusEl = document.getElementById("statusText");
 const subtitleEl = document.getElementById("subtitle");
@@ -48,7 +49,14 @@ async function getActiveTab(){
   return tab;
 }
 
+// ✅ Smart ensure: ping first, inject only if missing
 async function ensureContent(tabId){
+  try{
+    const res = await chrome.tabs.sendMessage(tabId, { type: "PING" });
+    if (res?.ok) return;
+  }catch{
+    // content not injected yet
+  }
   await chrome.scripting.executeScript({ target:{ tabId }, files:["content.js"] });
 }
 
