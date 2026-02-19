@@ -19,6 +19,19 @@ const btnDownloadSelected = document.getElementById("downloadSelected");
 const btnDownloadAll = document.getElementById("downloadAll");
 
 const toastEl = document.getElementById("toast");
+let buildingPreview = false;
+let stopPreview = false;
+
+function dedupeAppend(allItems, newItems){
+  const seen = new Set(allItems.map(x => x.url));
+  for (const it of newItems){
+    if (!it?.url) continue;
+    if (seen.has(it.url)) continue;
+    seen.add(it.url);
+    allItems.push(it);
+  }
+}
+
 
 let tabCache = null;
 let allItems = [];
@@ -222,40 +235,77 @@ async function liveToggle(){
 }
 
 async function buildPreview(){
+  // Click again to stop (no new UI needed)
+  if (buildingPreview){
+    stopPreview = true;
+    setStatus(`Stopping… (current: ${allItems.length})`);
+    return;
+  }
+
+  buildingPreview = true;
+  stopPreview = false;
+
+  setStatus("Building preview… (progressive)");
+  renderSkeletons?.(); // if you have it; safe if not
+  allItems = [];
+  render();
+
   const tab = await getActiveTab();
   tabCache = tab;
 
-  const site = normalizeSite(tab.url);
-  siteNameEl.textContent = site;
-
-  setStatus("Building preview from captured URLs…");
-  renderSkeletons();
-
   const cap = await chrome.runtime.sendMessage({ type:"CAPTURE_GET", tabId: tab.id });
   const urls = cap?.urls || [];
-  capCountEl.textContent = String(urls.length);
 
   if (!urls.length){
     allItems = [];
     render();
     setStatus("No captured URLs yet. Turn Live ON and scroll first.");
-    toast("No captured URLs");
+    buildingPreview = false;
     return;
   }
 
   await ensureContent(tab.id);
 
-  const res = await chrome.tabs.sendMessage(tab.id, {
-    type: "VERIFY_CAPTURED_URLS",
-    urls,
-    maxVerify: 260
-  });
+  // Tune these:
+  const batchSize = 260;  // how many urls processed per step
+  const maxProbe  = 220;  // how many off-DOM size checks per step
 
-  allItems = (res?.items || []);
-  render();
-  setStatus(`Ready — ${allItems.length} images (>=400×400).`);
-  toast(`Preview: ${allItems.length}`);
+  let start = 0;
+  let total = urls.length;
+
+  while (!stopPreview){
+    const res = await chrome.tabs.sendMessage(tab.id, {
+      type: "VERIFY_CAPTURED_URLS_BATCH",
+      urls,
+      start,
+      batchSize,
+      maxProbe
+    });
+
+    total = res.total || total;
+
+    dedupeAppend(allItems, res.items || []);
+    render();
+
+    start = res.nextStart ?? (start + batchSize);
+
+    setStatus(`Preview: ${allItems.length} • Processed ${Math.min(start, total)}/${total}`);
+
+    if (res.done) break;
+
+    // small breathing room so popup stays smooth
+    await new Promise(r => setTimeout(r, 40));
+  }
+
+  if (stopPreview){
+    setStatus(`Stopped • Preview: ${allItems.length}`);
+  } else {
+    setStatus(`Done • Preview: ${allItems.length} images (>=400×400)`);
+  }
+
+  buildingPreview = false;
 }
+
 
 async function clearCaptured(){
   const tab = await getActiveTab();
