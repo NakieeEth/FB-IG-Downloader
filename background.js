@@ -1,5 +1,3 @@
-// ===== Captured store (per-tab) =====
-// We persist to storage.local so it survives service worker sleep.
 async function getCaptured(tabId) {
   const key = `cap_${tabId}`;
   const data = await chrome.storage.local.get(key);
@@ -23,7 +21,6 @@ async function clearCaptured(tabId) {
   await chrome.storage.local.remove(key);
 }
 
-// ===== Folder naming =====
 function sanitize(name) {
   return (name || "images")
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
@@ -56,15 +53,13 @@ function guessExt(url) {
     if (p.includes(".png")) return "png";
     if (p.includes(".webp")) return "webp";
   } catch {}
-  return "jpg"; // many FB/IG URLs don't include extension
+  return "jpg";
 }
 
-// ===== Messages =====
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     const t = msg?.type;
 
-    // Live capture: add URLs
     if (t === "CAPTURE_ADD") {
       const tabId = msg.tabId;
       const urls = Array.isArray(msg.urls) ? msg.urls : [];
@@ -73,7 +68,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return;
     }
 
-    // Live capture: get all captured URLs
     if (t === "CAPTURE_GET") {
       const tabId = msg.tabId;
       const set = await getCaptured(tabId);
@@ -81,14 +75,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return;
     }
 
-    // Live capture: clear
     if (t === "CAPTURE_CLEAR") {
       await clearCaptured(msg.tabId);
       sendResponse({ ok: true });
       return;
     }
 
-    // Download URLs (existing behavior)
     if (t === "DOWNLOAD_URLS") {
       const urls = msg.urls || [];
       const tab = await chrome.tabs.get(msg.tabId);
