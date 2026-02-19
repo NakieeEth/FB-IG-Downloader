@@ -3,7 +3,7 @@
   if (window.__SID_CONTENT_LOADED__) return;
   window.__SID_CONTENT_LOADED__ = true;
 
-  // ✅ UPDATED SIZE FILTER
+  // ✅ UPDATED LIMITS
   const MIN_W = 300;
   const MIN_H = 300;
 
@@ -60,6 +60,125 @@
     return Array.from(new Set(urls));
   }
 
+  // ===== Floating LIVE badge (page overlay) =====
+  const BADGE_ID = "__sid_live_badge__";
+
+  function ensureBadge() {
+    let el = document.getElementById(BADGE_ID);
+    if (el) return el;
+
+    el = document.createElement("div");
+    el.id = BADGE_ID;
+    el.style.cssText = `
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 2147483647;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(12px);
+      color: rgba(255,255,255,.92);
+      font: 600 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      box-shadow: 0 20px 60px rgba(0,0,0,.55);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      user-select:none;
+    `;
+
+    const dot = document.createElement("div");
+    dot.style.cssText = `
+      width:10px; height:10px; border-radius:999px;
+      background: #2fe08a;
+      box-shadow: 0 0 0 6px rgba(47,224,138,.14);
+      animation: __sid_pulse 1.2s ease-in-out infinite;
+    `;
+
+    const text = document.createElement("div");
+    text.innerHTML = `<div style="font-weight:900; letter-spacing:.2px">LIVE CAPTURE</div>
+                      <div style="opacity:.65; font-weight:700; font-size:11px; margin-top:1px" id="__sid_badge_count">capturing…</div>`;
+
+    el.appendChild(dot);
+    el.appendChild(text);
+
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes __sid_pulse { 0%,100%{ transform:scale(1); opacity:.82 } 50%{ transform:scale(1.15); opacity:1 } }
+    `;
+    document.documentElement.appendChild(style);
+    document.documentElement.appendChild(el);
+    return el;
+  }
+
+  function showBadge(on) {
+    const el = ensureBadge();
+    el.style.display = on ? "flex" : "none";
+  }
+
+  function setBadgeCount(n) {
+    const el = document.getElementById("__sid_badge_count");
+    if (el) el.textContent = `${n} urls captured`;
+  }
+
+  // ===== Live capture engine =====
+  const LIVE_KEY = "__sid_live_capture_state__";
+  function liveState() {
+    if (!window[LIVE_KEY]) window[LIVE_KEY] = { on:false, obs:null, timer:null, lastSent:0, tabId:null, lastCount:0 };
+    return window[LIVE_KEY];
+  }
+
+  async function sendCapturedBatch(tabId) {
+    const urls = collectUrlsFast();
+    if (!urls.length) return;
+    const res = await chrome.runtime.sendMessage({ type: "CAPTURE_ADD", tabId, urls });
+    const count = res?.count ?? urls.length;
+    const st = liveState();
+    st.lastCount = count;
+    setBadgeCount(count);
+  }
+
+  function startLive(tabId) {
+    const st = liveState();
+    if (st.on) return;
+    st.on = true;
+    st.tabId = tabId;
+    showBadge(true);
+
+    st.obs = new MutationObserver(() => {
+      const now = Date.now();
+      if (now - st.lastSent < 650) return;
+      st.lastSent = now;
+      sendCapturedBatch(tabId).catch(() => {});
+    });
+
+    st.obs.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src", "style"]
+    });
+
+    st.timer = setInterval(() => {
+      sendCapturedBatch(tabId).catch(() => {});
+    }, 1500);
+
+    sendCapturedBatch(tabId).catch(() => {});
+  }
+
+  function stopLive() {
+    const st = liveState();
+    st.on = false;
+    st.tabId = null;
+    if (st.obs) { try { st.obs.disconnect(); } catch {} }
+    st.obs = null;
+    if (st.timer) { try { clearInterval(st.timer); } catch {} }
+    st.timer = null;
+    showBadge(false);
+  }
+
+  // ===== Verify captured URLs into preview items (>= MIN) =====
   function measureUrl(url) {
     return new Promise(resolve => {
       const img = new Image();
@@ -81,7 +200,7 @@
     return out;
   }
 
-  async function verifyCapturedStrict(urls, maxVerify = 1000) {
+  async function verifyCapturedStrict(urls, maxVerify = 260) {
     const unique = Array.from(new Set(urls)).slice(0, 5000);
 
     const domMap = new Map();
@@ -107,7 +226,7 @@
       const dom = domMap.get(url);
       if (dom) {
         if (dom.w >= MIN_W && dom.h >= MIN_H) {
-          results.push({ url, w: dom.w, h: dom.h, mimeGuess: guessMime(url) });
+          results.push({ url, w: dom.w, h: dom.h, mimeGuess: guessMime(url), source: "cap-dom" });
         }
         continue;
       }
@@ -117,17 +236,30 @@
 
       const { w, h } = await measureUrl(url);
       if (w >= MIN_W && h >= MIN_H) {
-        results.push({ url, w, h, mimeGuess: guessMime(url) });
+        results.push({ url, w, h, mimeGuess: guessMime(url), source: "cap-verify" });
       }
     }
 
     return { items: dedupeItems(results) };
   }
 
+  // ===== Messages =====
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const t = msg?.type;
 
     if (t === "PING") {
+      sendResponse({ ok: true, loaded: true });
+      return true;
+    }
+
+    if (t === "LIVE_START") {
+      startLive(msg.tabId);
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (t === "LIVE_STOP") {
+      stopLive();
       sendResponse({ ok: true });
       return true;
     }
@@ -135,7 +267,7 @@
     if (t === "VERIFY_CAPTURED_URLS") {
       (async () => {
         const urls = Array.isArray(msg.urls) ? msg.urls : [];
-        const res = await verifyCapturedStrict(urls, Number(msg.maxVerify ?? 1000));
+        const res = await verifyCapturedStrict(urls, Number(msg.maxVerify ?? 260));
         sendResponse(res);
       })();
       return true;
