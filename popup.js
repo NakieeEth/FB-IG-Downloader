@@ -1,443 +1,220 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root{
-      --bg0:#05070e;
-      --bg1:#0a0f1f;
-      --glass:rgba(255,255,255,.06);
-      --glass2:rgba(255,255,255,.035);
-      --border:rgba(255,255,255,.10);
-      --border2:rgba(255,255,255,.07);
-      --text:rgba(255,255,255,.92);
-      --muted:rgba(255,255,255,.64);
-      --muted2:rgba(255,255,255,.45);
-      --shadow: 0 14px 40px rgba(0,0,0,.55);
-      --accent:#5aa7ff;
-      --accent2:#7c5cff;
-      --ok:#2fe08a;
-      --danger:#ff5b72;
-      --r:16px;
-    }
+const listEl = document.getElementById("list");
+const searchEl = document.getElementById("search");
+const statusTextEl = document.getElementById("statusText");
+const countPillEl = document.getElementById("countPill");
+const selPillEl = document.getElementById("selPill");
+const siteChipEl = document.getElementById("siteChip");
+const subtitleEl = document.getElementById("subtitle");
 
-    *{ box-sizing:border-box; }
-    html,body{ margin:0; padding:0; }
-    body{
-      width: 468px;
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background:
-        radial-gradient(900px 520px at 20% 0%, rgba(90,167,255,.22), transparent 55%),
-        radial-gradient(780px 480px at 90% 15%, rgba(124,92,255,.18), transparent 58%),
-        radial-gradient(700px 420px at 50% 120%, rgba(47,224,138,.10), transparent 60%),
-        linear-gradient(180deg, var(--bg1), var(--bg0));
-    }
+const btnRefresh = document.getElementById("refresh");
+const btnSelectAll = document.getElementById("selectAll");
+const btnSelectNone = document.getElementById("selectNone");
+const btnDownloadSelected = document.getElementById("downloadSelected");
+const btnDownloadAll = document.getElementById("downloadAll");
+const btnDownloadSelected2 = document.getElementById("downloadSelected2");
+const btnDownloadAll2 = document.getElementById("downloadAll2");
 
-    /* Animations */
-    @keyframes popIn {
-      from { opacity:0; transform: translateY(8px) scale(.985); }
-      to   { opacity:1; transform: translateY(0) scale(1); }
-    }
-    @keyframes shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
+let allItems = [];
+let viewItems = [];
+let tabCache = null;
 
-    /* Header */
-    header{
-      position: sticky;
-      top:0;
-      z-index: 50;
-      padding: 12px 12px 10px;
-      background: linear-gradient(180deg, rgba(10,15,31,.92), rgba(5,7,14,.55));
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border2);
-    }
+function setStatus(msg){ statusTextEl.textContent = msg; }
+function setCount(n){ countPillEl.textContent = String(n); }
+function setSelectedCount(n){ selPillEl.textContent = String(n); }
 
-    .top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:10px;
-    }
+function normalizeSite(tabUrl){
+  try{
+    const host = new URL(tabUrl).hostname;
+    if (host.includes("instagram.com")) return "Instagram";
+    if (host.includes("facebook.com")) return "Facebook";
+    return host.replace(/^www\./,"");
+  }catch{ return "FB/IG"; }
+}
 
-    .brand{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      min-width:0;
-    }
+function renderSkeletons(){
+  listEl.className = "grid";
+  listEl.innerHTML = "";
+  for (let i = 0; i < 12; i++){
+    const sk = document.createElement("div");
+    sk.className = "skeleton";
+    listEl.appendChild(sk);
+  }
+  setCount(0);
+  setSelectedCount(0);
+}
 
-    .logo{
-      width:36px;
-      height:36px;
-      border-radius: 14px;
-      background:
-        radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,.22), transparent 55%),
-        linear-gradient(135deg, rgba(90,167,255,.48), rgba(124,92,255,.32));
-      border:1px solid rgba(255,255,255,.14);
-      box-shadow: 0 12px 30px rgba(0,0,0,.38);
-      flex:0 0 auto;
-    }
+function renderEmpty(msg){
+  listEl.className = "";
+  listEl.innerHTML = `<div class="empty">${msg}</div>`;
+  setCount(0);
+  setSelectedCount(0);
+}
 
-    .titleWrap{
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-      min-width:0;
-    }
+function updateSelectedCount(){
+  const checks = listEl.querySelectorAll('input[type="checkbox"][data-idx]');
+  let c = 0;
+  for (const cb of checks) if (cb.checked) c++;
+  setSelectedCount(c);
+}
 
-    .title{
-      font-weight: 900;
-      font-size: 13px;
-      letter-spacing: .25px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow: ellipsis;
-    }
+function render(){
+  listEl.innerHTML = "";
 
-    .subtitle{
-      font-size: 11px;
-      color: var(--muted);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow: ellipsis;
-    }
+  if (!viewItems.length){
+    return renderEmpty("No images found (or all filtered out). Scroll the page and refresh ↻.");
+  }
 
-    .chip{
-      font-size: 11px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border:1px solid var(--border2);
-      background: rgba(255,255,255,.03);
-      color: var(--muted);
-      flex:0 0 auto;
-    }
-    .chip strong{ color: var(--text); }
+  listEl.className = "grid";
+  setCount(viewItems.length);
 
-    /* Controls */
-    .controls{ display:grid; gap:8px; }
+  viewItems.forEach((it, idx) => {
+    const card = document.createElement("div");
+    card.className = "card selected";
+    card.style.setProperty("--i", idx);
 
-    .searchRow{
-      display:flex;
-      gap:8px;
-      align-items:center;
-    }
+    const glow = document.createElement("div");
+    glow.className = "selGlow";
 
-    .search{ flex:1; position:relative; }
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "check";
+    cb.checked = true;
+    cb.dataset.idx = String(idx);
 
-    input[type="text"]{
-      width:100%;
-      padding: 10px 12px 10px 34px;
-      border-radius: 14px;
-      border:1px solid var(--border2);
-      background: rgba(255,255,255,.03);
-      color: var(--text);
-      outline:none;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
-    }
-    input[type="text"]::placeholder{ color: var(--muted2); }
+    const wrap = document.createElement("div");
+    wrap.className = "thumbWrap";
 
-    .searchIcon{
-      position:absolute;
-      left:12px;
-      top:50%;
-      transform: translateY(-50%);
-      opacity:.55;
-      font-size: 12px;
-      pointer-events:none;
-    }
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.loading = "lazy";
+    img.src = it.url;
 
-    .btnRow{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-    }
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
 
-    button{
-      border:1px solid var(--border2);
-      background: rgba(255,255,255,.03);
-      color: var(--text);
-      padding: 9px 10px;
-      border-radius: 14px;
-      cursor:pointer;
-      font-weight: 900;
-      font-size: 12px;
-      transition: transform .06s ease, background .15s ease, border .15s ease, box-shadow .15s ease;
-      box-shadow: 0 10px 22px rgba(0,0,0,.24);
-      user-select:none;
-    }
-    button:hover{
-      background: rgba(255,255,255,.06);
-      border-color: rgba(255,255,255,.12);
-      box-shadow: 0 14px 30px rgba(0,0,0,.32);
-    }
-    button:active{ transform: translateY(1px) scale(.995); }
+    const meta = document.createElement("div");
+    meta.className = "meta";
 
-    button.primary{
-      background: linear-gradient(135deg, rgba(90,167,255,.30), rgba(124,92,255,.18));
-      border-color: rgba(90,167,255,.28);
-    }
+    const badgeL = document.createElement("div");
+    badgeL.className = "badge";
+    badgeL.textContent = it.mimeGuess ? it.mimeGuess.replace("image/","").toUpperCase() : "IMG";
 
-    button.icon{
-      width:38px;
-      padding: 9px 0;
-      text-align:center;
-      font-weight: 1000;
-    }
+    const badgeR = document.createElement("div");
+    badgeR.className = "badge";
+    badgeR.textContent = `${it.w}×${it.h}`;
 
-    .statusRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-top:2px;
-    }
+    meta.appendChild(badgeL);
+    meta.appendChild(badgeR);
 
-    .status{
-      font-size: 12px;
-      color: var(--muted);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow: ellipsis;
-    }
+    wrap.appendChild(img);
 
-    .counter{
-      font-size: 11px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border:1px solid var(--border2);
-      background: rgba(255,255,255,.03);
-      color: var(--muted);
-      display:flex;
-      gap:7px;
-      align-items:center;
-      flex:0 0 auto;
-    }
-    .dot{
-      width:8px; height:8px;
-      border-radius:999px;
-      background: rgba(255,255,255,.22);
-      box-shadow: 0 0 0 3px rgba(255,255,255,.06);
-    }
+    card.appendChild(glow);
+    card.appendChild(cb);
+    card.appendChild(wrap);
+    card.appendChild(overlay);
+    card.appendChild(meta);
 
-    /* Main */
-    main{ padding: 12px; }
+    // Toggle selection on card click
+    card.addEventListener("click", (e) => {
+      if (e.target === cb) return;
+      cb.checked = !cb.checked;
+      card.classList.toggle("selected", cb.checked);
+      updateSelectedCount();
+    });
 
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
+    cb.addEventListener("change", () => {
+      card.classList.toggle("selected", cb.checked);
+      updateSelectedCount();
+    });
 
-    /* Card */
-    .card{
-      position:relative;
-      border-radius: 18px;
-      overflow:hidden;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.02);
-      box-shadow: var(--shadow);
-      cursor:pointer;
-      user-select:none;
-      animation: popIn .18s ease both;
-      animation-delay: calc(var(--i, 0) * 10ms);
-    }
+    // Right-click to open image in new tab (nice for checking quality)
+    card.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: it.url });
+    });
 
-    .thumbWrap{
-      aspect-ratio: 1 / 1;
-      background: rgba(255,255,255,.03);
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      position:relative;
-    }
+    listEl.appendChild(card);
+  });
 
-    .thumb{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      transform: scale(1.0);
-      transition: transform .18s ease, filter .18s ease;
-      display:block;
-    }
-    .card:hover .thumb{
-      transform: scale(1.06);
-      filter: saturate(1.08) contrast(1.05);
-    }
+  updateSelectedCount();
+}
 
-    .overlay{
-      position:absolute;
-      inset:0;
-      background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.40));
-      opacity: 0;
-      transition: opacity .18s ease;
-      pointer-events:none;
-    }
-    .card:hover .overlay{ opacity: 1; }
+function applyFilter(){
+  const q = (searchEl.value || "").trim().toLowerCase();
+  if (!q) viewItems = allItems.slice();
+  else viewItems = allItems.filter(it => (it.url || "").toLowerCase().includes(q));
+  render();
+}
 
-    .meta{
-      position:absolute;
-      left:8px;
-      right:8px;
-      bottom:8px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
-      pointer-events:none;
-    }
+function getSelectedUrls(){
+  const urls = [];
+  const checks = listEl.querySelectorAll('input[type="checkbox"][data-idx]');
+  for (const cb of checks){
+    if (!cb.checked) continue;
+    const idx = Number(cb.dataset.idx);
+    const it = viewItems[idx];
+    if (it?.url) urls.push(it.url);
+  }
+  return urls;
+}
 
-    .badge{
-      font-size: 10px;
-      padding: 4px 7px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.15);
-      background: rgba(0,0,0,.40);
-      color: rgba(255,255,255,.88);
-      backdrop-filter: blur(8px);
-      white-space:nowrap;
-    }
+async function getActiveTab(){
+  const [tab] = await chrome.tabs.query({ active:true, currentWindow:true });
+  if (!tab?.id) throw new Error("No active tab found.");
+  return tab;
+}
 
-    .check{
-      pointer-events:auto;
-      position:absolute;
-      top:8px; left:8px;
-      width:18px; height:18px;
-      accent-color: var(--accent);
-      filter: drop-shadow(0 3px 10px rgba(0,0,0,.45));
-      transition: transform .12s ease;
-    }
-    .check:active{ transform: scale(.95); }
+async function refresh(){
+  setStatus("Scanning…");
+  renderSkeletons();
 
-    .selGlow{
-      position:absolute;
-      inset:-2px;
-      border-radius: 20px;
-      border: 2px solid rgba(90,167,255,.0);
-      box-shadow: 0 0 0 rgba(0,0,0,0);
-      transition: border-color .18s ease, box-shadow .18s ease;
-      pointer-events:none;
-    }
-    .card.selected .selGlow{
-      border-color: rgba(90,167,255,.70);
-      box-shadow: 0 0 0 6px rgba(90,167,255,.14);
-    }
+  const tab = await getActiveTab();
+  tabCache = tab;
 
-    /* Skeleton */
-    .skeleton{
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.03);
-      overflow:hidden;
-      height: 0;
-      padding-bottom: 100%;
-      position:relative;
-    }
-    .skeleton::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background: linear-gradient(
-        90deg,
-        rgba(255,255,255,.03),
-        rgba(255,255,255,.08),
-        rgba(255,255,255,.03)
-      );
-      background-size: 200% 100%;
-      animation: shimmer 1.1s linear infinite;
-    }
+  const site = normalizeSite(tab.url);
+  siteChipEl.innerHTML = `<strong>${site}</strong>`;
+  subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
 
-    /* Footer */
-    .footer{
-      display:flex;
-      gap:8px;
-      margin-top: 12px;
-      position:sticky;
-      bottom:0;
-      padding: 10px 0 2px;
-      background: linear-gradient(180deg, rgba(5,7,14,0), rgba(5,7,14,.88));
-      backdrop-filter: blur(10px);
-    }
-    .footer button{ flex:1; }
+  await chrome.scripting.executeScript({
+    target:{ tabId: tab.id },
+    files:["content.js"]
+  });
 
-    .note{
-      font-size: 11px;
-      color: var(--muted2);
-      padding: 10px 2px 0;
-      line-height: 1.35;
-    }
+  const res = await chrome.tabs.sendMessage(tab.id, { type:"COLLECT_SOCIAL_IMAGES" });
+  allItems = (res?.items || []);
+  applyFilter();
 
-    .empty{
-      padding: 18px 14px;
-      border-radius: var(--r);
-      border: 1px dashed rgba(255,255,255,.14);
-      background: rgba(255,255,255,.02);
-      color: var(--muted);
-      text-align:center;
-    }
-  </style>
-</head>
+  setStatus(`Ready — ${allItems.length} images.`);
+}
 
-<body>
-  <header>
-    <div class="top">
-      <div class="brand">
-        <div class="logo"></div>
-        <div class="titleWrap">
-          <div class="title">Social Image Downloader</div>
-          <div class="subtitle" id="subtitle">FB/IG • JPG/PNG/WEBP • skip &lt;200×200</div>
-        </div>
-      </div>
-      <div class="chip" id="siteChip"><strong>—</strong></div>
-    </div>
+function setAllSelection(state){
+  const cards = listEl.querySelectorAll(".card");
+  const checks = listEl.querySelectorAll('input[type="checkbox"][data-idx]');
+  for (let i=0;i<checks.length;i++){
+    checks[i].checked = state;
+    cards[i]?.classList.toggle("selected", state);
+  }
+  updateSelectedCount();
+}
 
-    <div class="controls">
-      <div class="searchRow">
-        <div class="search">
-          <div class="searchIcon">⌕</div>
-          <input id="search" type="text" placeholder="Filter by URL (optional)..." />
-        </div>
-        <button class="icon" id="refresh" title="Refresh">↻</button>
-      </div>
+async function download(urls){
+  if (!urls.length) return setStatus("Nothing selected.");
+  const tab = tabCache || await getActiveTab();
+  setStatus(`Starting ${urls.length} downloads…`);
+  await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
+  setStatus(`Started ${urls.length} downloads.`);
+}
 
-      <div class="btnRow">
-        <button id="selectAll">Select all</button>
-        <button id="selectNone">Select none</button>
-        <button class="primary" id="downloadSelected">Download selected</button>
-        <button id="downloadAll">Download all</button>
-      </div>
+btnRefresh.addEventListener("click", () => refresh().catch(e => setStatus("Error: " + (e?.message || e))));
+btnSelectAll.addEventListener("click", () => setAllSelection(true));
+btnSelectNone.addEventListener("click", () => setAllSelection(false));
 
-      <div class="statusRow">
-        <div class="status" id="statusText">Ready.</div>
-        <div class="counter" title="Shown / Selected">
-          <span class="dot"></span>
-          <span id="countPill">0</span>
-          <span style="opacity:.55">/</span>
-          <span id="selPill">0</span>
-        </div>
-      </div>
-    </div>
-  </header>
+btnDownloadSelected.addEventListener("click", () => download(getSelectedUrls()).catch(e => setStatus("Error: " + (e?.message || e))));
+btnDownloadSelected2.addEventListener("click", () => download(getSelectedUrls()).catch(e => setStatus("Error: " + (e?.message || e))));
+btnDownloadAll.addEventListener("click", () => download(allItems.map(x=>x.url)).catch(e => setStatus("Error: " + (e?.message || e))));
+btnDownloadAll2.addEventListener("click", () => download(allItems.map(x=>x.url)).catch(e => setStatus("Error: " + (e?.message || e))));
 
-  <main>
-    <div id="list" class="grid"></div>
+searchEl.addEventListener("input", () => applyFilter());
 
-    <div class="footer">
-      <button class="primary" id="downloadSelected2">Download selected</button>
-      <button id="downloadAll2">Download all</button>
-    </div>
-
-    <div class="note">
-      Tip: FB/IG load content dynamically. Scroll to load more images, then hit refresh ↻.
-      (Some images may still be blocked by the site.)
-    </div>
-  </main>
-
-  <script src="popup.js"></script>
-</body>
-</html>
+// Auto scan on open
+refresh().catch(e => setStatus("Error: " + (e?.message || e)));
