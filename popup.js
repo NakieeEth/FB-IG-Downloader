@@ -7,14 +7,13 @@ const siteChipEl = document.getElementById("siteChip");
 const subtitleEl = document.getElementById("subtitle");
 
 const btnRefresh = document.getElementById("refresh");
+const btnSmartScrollScan = document.getElementById("smartScrollScan");
 const btnSelectAll = document.getElementById("selectAll");
 const btnSelectNone = document.getElementById("selectNone");
 const btnDownloadSelected = document.getElementById("downloadSelected");
 const btnDownloadAll = document.getElementById("downloadAll");
 const btnDownloadSelected2 = document.getElementById("downloadSelected2");
 const btnDownloadAll2 = document.getElementById("downloadAll2");
-const btnAutoScrollScan = document.getElementById("autoScrollScan");
-
 
 let allItems = [];
 let viewItems = [];
@@ -36,7 +35,7 @@ function normalizeSite(tabUrl){
 function renderSkeletons(){
   listEl.className = "grid";
   listEl.innerHTML = "";
-  for (let i = 0; i < 12; i++){
+  for (let i = 0; i < 15; i++){
     const sk = document.createElement("div");
     sk.className = "skeleton";
     listEl.appendChild(sk);
@@ -63,7 +62,7 @@ function render(){
   listEl.innerHTML = "";
 
   if (!viewItems.length){
-    return renderEmpty("No images found (or all filtered out). Scroll the page and refresh ↻.");
+    return renderEmpty("No images found (or all filtered out). Try Smart scroll + scan.");
   }
 
   listEl.className = "grid";
@@ -116,7 +115,6 @@ function render(){
     card.appendChild(overlay);
     card.appendChild(meta);
 
-    // Toggle selection on card click
     card.addEventListener("click", (e) => {
       if (e.target === cb) return;
       cb.checked = !cb.checked;
@@ -129,7 +127,6 @@ function render(){
       updateSelectedCount();
     });
 
-    // Right-click to open image in new tab (nice for checking quality)
     card.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       chrome.tabs.create({ url: it.url });
@@ -166,8 +163,34 @@ async function getActiveTab(){
   return tab;
 }
 
+async function injectAndScan(tab, messageType){
+  await chrome.scripting.executeScript({
+    target:{ tabId: tab.id },
+    files:["content.js"]
+  });
+
+  const res = await chrome.tabs.sendMessage(tab.id, messageType);
+  allItems = (res?.items || []);
+  applyFilter();
+}
+
 async function refresh(){
   setStatus("Scanning…");
+  renderSkeletons();
+
+  const tab = await getActiveTab();
+  tabCache = tab;
+
+  const site = normalizeSite(tab.url);
+  siteChipEl.innerHTML = `<strong>${site}</strong>`;
+  subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
+
+  await injectAndScan(tab, { type:"COLLECT_SOCIAL_IMAGES" });
+  setStatus(`Ready — ${allItems.length} images.`);
+}
+
+async function smartScrollThenScan(){
+  setStatus("Smart scrolling…");
   renderSkeletons();
 
   const tab = await getActiveTab();
@@ -182,11 +205,17 @@ async function refresh(){
     files:["content.js"]
   });
 
-  const res = await chrome.tabs.sendMessage(tab.id, { type:"COLLECT_SOCIAL_IMAGES" });
+  const res = await chrome.tabs.sendMessage(tab.id, {
+    type: "SMART_SCROLL_AND_COLLECT",
+    stepPx: 950,
+    delayMs: 700,
+    maxScrolls: 70,
+    settleRounds: 4
+  });
+
   allItems = (res?.items || []);
   applyFilter();
-
-  setStatus(`Ready — ${allItems.length} images.`);
+  setStatus(`Ready — ${allItems.length} images (smart scroll).`);
 }
 
 function setAllSelection(state){
@@ -206,43 +235,10 @@ async function download(urls){
   await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
   setStatus(`Started ${urls.length} downloads.`);
 }
-async function autoScrollThenScan() {
-  try {
-    setStatus("Auto-scrolling ×10…");
-    renderSkeletons();
-
-    const tab = await getActiveTab();
-    tabCache = tab;
-
-    const site = normalizeSite(tab.url);
-    siteChipEl.innerHTML = `<strong>${site}</strong>`;
-    subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"]
-    });
-
-    const res = await chrome.tabs.sendMessage(tab.id, {
-      type: "AUTO_SCROLL_AND_COLLECT",
-      times: 10,
-      stepPx: 900,
-      delayMs: 650
-    });
-
-    allItems = (res?.items || []);
-    applyFilter();
-
-    setStatus(`Ready — ${allItems.length} images (after auto-scroll).`);
-  } catch (e) {
-    setStatus("Error: " + (e?.message || e));
-  }
-}
-btnAutoScrollScan.addEventListener("click", () =>
-  autoScrollThenScan().catch(e => setStatus("Error: " + (e?.message || e)))
-);
 
 btnRefresh.addEventListener("click", () => refresh().catch(e => setStatus("Error: " + (e?.message || e))));
+btnSmartScrollScan.addEventListener("click", () => smartScrollThenScan().catch(e => setStatus("Error: " + (e?.message || e))));
+
 btnSelectAll.addEventListener("click", () => setAllSelection(true));
 btnSelectNone.addEventListener("click", () => setAllSelection(false));
 
