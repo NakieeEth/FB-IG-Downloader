@@ -1,4 +1,3 @@
-// popup.js
 const listEl = document.getElementById("list");
 const statusEl = document.getElementById("statusText");
 const subtitleEl = document.getElementById("subtitle");
@@ -7,6 +6,9 @@ const siteNameEl = document.getElementById("siteName");
 const siteDotEl = document.getElementById("siteDot");
 const liveDotEl = document.getElementById("liveDot");
 const capCountEl = document.getElementById("capCount");
+
+const modeToggleBtn = document.getElementById("modeToggle");
+const modeLabelEl = document.getElementById("modeLabel");
 
 const shownCountEl = document.getElementById("shownCount");
 const selCountEl = document.getElementById("selCount");
@@ -26,6 +28,12 @@ let allItems = [];
 let liveOn = false;
 let pollTimer = null;
 
+// Download mode: "auto" (default), "zip", "files"
+const MODE_KEY = "sid_dl_mode";
+const MODES = ["auto", "zip", "files"];
+const ZIP_THRESHOLD = 90; // auto-switch to ZIP when downloading >= this many
+let dlMode = "auto";
+
 function toast(msg){
   toastEl.textContent = msg;
   toastEl.classList.add("show");
@@ -33,6 +41,29 @@ function toast(msg){
 }
 
 function setStatus(msg){ statusEl.textContent = msg; }
+
+function modeLabel(m){
+  if (m === "zip") return "Mode: ZIP";
+  if (m === "files") return "Mode: Files";
+  return "Mode: Auto";
+}
+
+async function loadMode(){
+  try{
+    const data = await chrome.storage.local.get(MODE_KEY);
+    const m = data?.[MODE_KEY];
+    dlMode = MODES.includes(m) ? m : "auto";
+  }catch{ dlMode = "auto"; }
+  if (modeLabelEl) modeLabelEl.textContent = modeLabel(dlMode);
+}
+
+async function cycleMode(){
+  const i = MODES.indexOf(dlMode);
+  dlMode = MODES[(i + 1 + MODES.length) % MODES.length] || "auto";
+  try{ await chrome.storage.local.set({ [MODE_KEY]: dlMode }); }catch{}
+  if (modeLabelEl) modeLabelEl.textContent = modeLabel(dlMode);
+  toast(modeLabel(dlMode).replace("Mode: ", ""));
+}
 
 function normalizeSite(tabUrl){
   try{
@@ -49,7 +80,7 @@ async function getActiveTab(){
   return tab;
 }
 
-// ✅ Smart ensure: ping first, inject only if missing
+// Smart ensure: ping first, inject only if missing
 async function ensureContent(tabId){
   try{
     const res = await chrome.tabs.sendMessage(tabId, { type: "PING" });
@@ -269,26 +300,20 @@ async function clearCaptured(){
   const tab = await getActiveTab();
   tabCache = tab;
 
-  // ✅ If live is running, stop it first so it doesn't instantly re-add URLs
+  // stop live first so it doesn't instantly re-add URLs
   try{
     await ensureContent(tab.id);
-    await chrome.tabs.sendMessage(tab.id, { type: "LIVE_STOP" });
+    await chrome.tabs.sendMessage(tab.id, { type:"LIVE_STOP" });
   }catch{}
-
-  setLiveUi(false);         // update UI state
-  stopPolling();            // optional: stop timer for a moment
+  setLiveUi(false);
 
   await chrome.runtime.sendMessage({ type:"CAPTURE_CLEAR", tabId: tab.id });
-
   capCountEl.textContent = "0";
   allItems = [];
   render();
   setStatus("Captured list cleared.");
   toast("Cleared");
-
-  startPolling();           // resume polling
 }
-
 
 async function download(urls){
   if (!urls.length){
@@ -296,10 +321,27 @@ async function download(urls){
     return;
   }
   const tab = tabCache || await getActiveTab();
-  setStatus(`Starting ${urls.length} downloads…`);
-  await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
-  setStatus(`Started ${urls.length} downloads.`);
-  toast(`Downloading ${urls.length}`);
+
+  const useZip = (dlMode === "zip") || (dlMode === "auto" && urls.length >= ZIP_THRESHOLD);
+
+  if (useZip){
+    setStatus(`Preparing ZIP (${urls.length} files)…`);
+    const res = await chrome.runtime.sendMessage({ type:"DOWNLOAD_ZIP", tabId: tab.id, urls });
+    const n = res?.count ?? urls.length;
+    setStatus(`ZIP download started — ${n} files.`);
+    toast(`ZIP: ${n} files`);
+  } else {
+    setStatus(`Starting ${urls.length} downloads…`);
+    const res = await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
+    const n = res?.count ?? urls.length;
+    if (res?.capped) {
+      setStatus(`Started ${n} downloads (capped).`);
+      toast(`Downloaded ${n} (cap)`);
+    } else {
+      setStatus(`Started ${n} downloads.`);
+      toast(`Downloading ${n}`);
+    }
+  }
 }
 
 async function init(){
@@ -311,6 +353,7 @@ async function init(){
   siteDotEl.style.background = "rgba(255,255,255,.22)";
 
   setLiveUi(false);
+  await loadMode();
   render();
   startPolling();
 }
@@ -322,5 +365,7 @@ btnSelectNone.addEventListener("click", () => setAllSelection(false));
 btnClearCaptured.addEventListener("click", () => clearCaptured().catch(e => setStatus("Error: " + (e?.message || e))));
 btnDownloadSelected.addEventListener("click", () => download(getSelectedUrls()).catch(e => setStatus("Error: " + (e?.message || e))));
 btnDownloadAll.addEventListener("click", () => download(allItems.map(x => x.url)).catch(e => setStatus("Error: " + (e?.message || e))));
+
+if (modeToggleBtn) modeToggleBtn.addEventListener("click", () => cycleMode().catch(()=>{}));
 
 init().catch(e => setStatus("Error: " + (e?.message || e)));
