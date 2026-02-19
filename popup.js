@@ -13,6 +13,8 @@ const btnDownloadSelected = document.getElementById("downloadSelected");
 const btnDownloadAll = document.getElementById("downloadAll");
 const btnDownloadSelected2 = document.getElementById("downloadSelected2");
 const btnDownloadAll2 = document.getElementById("downloadAll2");
+const btnAutoScrollScan = document.getElementById("autoScrollScan");
+
 
 let allItems = [];
 let viewItems = [];
@@ -204,6 +206,41 @@ async function download(urls){
   await chrome.runtime.sendMessage({ type:"DOWNLOAD_URLS", tabId: tab.id, urls });
   setStatus(`Started ${urls.length} downloads.`);
 }
+async function autoScrollThenScan() {
+  try {
+    setStatus("Auto-scrolling ×10…");
+    renderSkeletons();
+
+    const tab = await getActiveTab();
+    tabCache = tab;
+
+    const site = normalizeSite(tab.url);
+    siteChipEl.innerHTML = `<strong>${site}</strong>`;
+    subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"]
+    });
+
+    const res = await chrome.tabs.sendMessage(tab.id, {
+      type: "AUTO_SCROLL_AND_COLLECT",
+      times: 10,
+      stepPx: 900,
+      delayMs: 650
+    });
+
+    allItems = (res?.items || []);
+    applyFilter();
+
+    setStatus(`Ready — ${allItems.length} images (after auto-scroll).`);
+  } catch (e) {
+    setStatus("Error: " + (e?.message || e));
+  }
+}
+btnAutoScrollScan.addEventListener("click", () =>
+  autoScrollThenScan().catch(e => setStatus("Error: " + (e?.message || e)))
+);
 
 btnRefresh.addEventListener("click", () => refresh().catch(e => setStatus("Error: " + (e?.message || e))));
 btnSelectAll.addEventListener("click", () => setAllSelection(true));
