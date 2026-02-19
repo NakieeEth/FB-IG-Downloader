@@ -1,16 +1,7 @@
 const MIN_W = 200;
 const MIN_H = 200;
 
-async function autoScroll(times = 10, stepPx = 900, delayMs = 650) {
-  // Smooth-ish incremental scroll so FB/IG loads content
-  for (let i = 0; i < times; i++) {
-    window.scrollBy({ top: stepPx, left: 0, behavior: "smooth" });
-    await new Promise(r => setTimeout(r, delayMs));
-
-    // Extra tiny delay helps when network is slow
-    await new Promise(r => setTimeout(r, 150));
-  }
-}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
 function toAbs(url) {
   try { return new URL(url, location.href).href; } catch { return null; }
@@ -51,6 +42,67 @@ function extractCssBackgroundImages() {
   return urls;
 }
 
+async function waitForImagesToSettle(rounds = 3, gapMs = 300) {
+  let stable = 0;
+  let prevLoaded = -1;
+
+  for (let i = 0; i < rounds * 8; i++) {
+    const loaded = Array.from(document.images)
+      .filter(im => im.complete && (im.naturalWidth || 0) > 0).length;
+
+    if (loaded === prevLoaded) stable++;
+    else stable = 0;
+
+    prevLoaded = loaded;
+    if (stable >= rounds) return;
+
+    await sleep(gapMs);
+  }
+}
+
+function countVisibleImageCandidates() {
+  let count = 0;
+
+  document.querySelectorAll("img").forEach(img => {
+    const src = img.currentSrc || img.getAttribute("src");
+    if (src) count++;
+  });
+
+  document.querySelectorAll("*").forEach(el => {
+    const bg = getComputedStyle(el).backgroundImage;
+    if (bg && bg !== "none" && bg.includes("url(")) count++;
+  });
+
+  return count;
+}
+
+async function smartScroll({
+  stepPx = 950,
+  delayMs = 700,
+  maxScrolls = 70,
+  settleRounds = 4
+} = {}) {
+  let noNewRounds = 0;
+  let lastCount = countVisibleImageCandidates();
+
+  for (let i = 0; i < maxScrolls; i++) {
+    window.scrollBy({ top: stepPx, left: 0, behavior: "smooth" });
+    await sleep(delayMs);
+    await waitForImagesToSettle(2, 250);
+
+    const now = countVisibleImageCandidates();
+    if (now > lastCount + 2) {
+      lastCount = now;
+      noNewRounds = 0;
+    } else {
+      noNewRounds++;
+      if (noNewRounds >= settleRounds) break;
+    }
+  }
+
+  await waitForImagesToSettle(3, 300);
+}
+
 function collectFromImgs() {
   const items = [];
 
@@ -58,11 +110,15 @@ function collectFromImgs() {
     const url = toAbs(img.currentSrc || img.getAttribute("src"));
     if (!url || !looksLikeImage(url)) return;
 
-    // Use already-known dimensions (NO re-fetch)
-    const w = img.naturalWidth || img.width || 0;
-    const h = img.naturalHeight || img.height || 0;
+    // Prefer natural size; if not loaded yet, fallback to rendered size
+    let w = img.naturalWidth || 0;
+    let h = img.naturalHeight || 0;
+    if (!w || !h) {
+      const rect = img.getBoundingClientRect();
+      w = Math.round(rect.width);
+      h = Math.round(rect.height);
+    }
 
-    // Some images report 0 until loaded
     if (w >= MIN_W && h >= MIN_H) {
       items.push({ url, w, h, mimeGuess: guessMime(url), source: "img" });
     }
@@ -71,8 +127,8 @@ function collectFromImgs() {
   return items;
 }
 
-// Only for background images we may need to load to measure
-async function measureUrl(url) {
+// Only for background images (optional; limited so it doesn't freeze)
+function measureUrl(url) {
   return new Promise(resolve => {
     const img = new Image();
     img.referrerPolicy = "no-referrer";
@@ -82,7 +138,7 @@ async function measureUrl(url) {
   });
 }
 
-async function collectFromBackgrounds(maxToMeasure = 80) {
+async function collectFromBackgrounds(maxToMeasure = 60) {
   const bgUrls = Array.from(new Set(extractCssBackgroundImages()));
   const sliced = bgUrls.slice(0, maxToMeasure);
 
@@ -106,23 +162,10 @@ function dedupeByUrl(items) {
 }
 
 async function buildFilteredList() {
-  // Collect <img> first (stable & fast)
   const imgItems = collectFromImgs();
-
-  // Background images (optional, slower)
-  const bgItems = await collectFromBackgrounds(80);
-
+  const bgItems = await collectFromBackgrounds(60);
   const all = dedupeByUrl([...imgItems, ...bgItems]);
-
-  // Provide scan stats for UI
-  return {
-    items: all,
-    stats: {
-      fromImg: imgItems.length,
-      fromBg: bgItems.length,
-      total: all.length
-    }
-  };
+  return { items: all };
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -130,19 +173,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (t === "COLLECT_SOCIAL_IMAGES") {
     (async () => {
+      await waitForImagesToSettle(3, 300);
       const res = await buildFilteredList();
       sendResponse(res);
     })();
     return true;
   }
 
-  if (t === "AUTO_SCROLL_AND_COLLECT") {
+  if (t === "SMART_SCROLL_AND_COLLECT") {
     (async () => {
-      const times = Number(msg.times ?? 10);
-      const stepPx = Number(msg.stepPx ?? 900);
-      const delayMs = Number(msg.delayMs ?? 650);
-
-      await autoScroll(times, stepPx, delayMs);
+      await smartScroll({
+        stepPx: Number(msg.stepPx ?? 950),
+        delayMs: Number(msg.delayMs ?? 700),
+        maxScrolls: Number(msg.maxScrolls ?? 70),
+        settleRounds: Number(msg.settleRounds ?? 4)
+      });
 
       const res = await buildFilteredList();
       sendResponse(res);
@@ -150,4 +195,3 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
-
