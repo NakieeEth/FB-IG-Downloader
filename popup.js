@@ -269,13 +269,26 @@ async function clearCaptured(){
   const tab = await getActiveTab();
   tabCache = tab;
 
+  // ✅ If live is running, stop it first so it doesn't instantly re-add URLs
+  try{
+    await ensureContent(tab.id);
+    await chrome.tabs.sendMessage(tab.id, { type: "LIVE_STOP" });
+  }catch{}
+
+  setLiveUi(false);         // update UI state
+  stopPolling();            // optional: stop timer for a moment
+
   await chrome.runtime.sendMessage({ type:"CAPTURE_CLEAR", tabId: tab.id });
+
   capCountEl.textContent = "0";
   allItems = [];
   render();
   setStatus("Captured list cleared.");
   toast("Cleared");
+
+  startPolling();           // resume polling
 }
+
 
 async function download(urls){
   if (!urls.length){
