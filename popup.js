@@ -6,13 +6,11 @@ const selPillEl = document.getElementById("selPill");
 const siteChipEl = document.getElementById("siteChip");
 const subtitleEl = document.getElementById("subtitle");
 
-const btnRefresh = document.getElementById("refresh");
 const btnLiveStart = document.getElementById("liveStart");
 const btnLiveStop = document.getElementById("liveStop");
 const btnCapturedPreview = document.getElementById("capturedPreview");
 const btnCapturedClear = document.getElementById("capturedClear");
 
-const btnSmartScrollScan = document.getElementById("smartScrollScan");
 const btnSelectAll = document.getElementById("selectAll");
 const btnSelectNone = document.getElementById("selectNone");
 const btnDownloadSelected = document.getElementById("downloadSelected");
@@ -67,7 +65,7 @@ function render(){
   listEl.innerHTML = "";
 
   if (!viewItems.length){
-    return renderEmpty("No images found. Try Live ON + scroll, then Build Preview (Captured).");
+    return renderEmpty("No preview yet. Use Live ON and scroll, then Build Preview (Captured).");
   }
 
   listEl.className = "grid";
@@ -132,7 +130,6 @@ function render(){
       updateSelectedCount();
     });
 
-    // Right-click: open image in new tab
     card.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       chrome.tabs.create({ url: it.url });
@@ -173,82 +170,41 @@ async function ensureContent(tabId){
   await chrome.scripting.executeScript({ target:{ tabId }, files:["content.js"] });
 }
 
-async function refreshScan(){
-  setStatus("Scanning…");
-  renderSkeletons();
-
-  const tab = await getActiveTab();
-  tabCache = tab;
-  const site = normalizeSite(tab.url);
-  siteChipEl.innerHTML = `<strong>${site}</strong>`;
-  subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
-
-  await ensureContent(tab.id);
-
-  const res = await chrome.tabs.sendMessage(tab.id, { type:"COLLECT_SOCIAL_IMAGES" });
-  allItems = (res?.items || []);
-  applyFilter();
-
-  setStatus(`Ready — ${allItems.length} images.`);
-}
-
-async function smartScrollThenScan(){
-  setStatus("Smart scrolling…");
-  renderSkeletons();
-
-  const tab = await getActiveTab();
-  tabCache = tab;
-  const site = normalizeSite(tab.url);
-  siteChipEl.innerHTML = `<strong>${site}</strong>`;
-  subtitleEl.textContent = `${site} • JPG/PNG/WEBP • skip <200×200`;
-
-  await ensureContent(tab.id);
-
-  const res = await chrome.tabs.sendMessage(tab.id, {
-    type: "SMART_SCROLL_AND_COLLECT",
-    stepPx: 950,
-    delayMs: 700,
-    maxScrolls: 70,
-    settleRounds: 4
-  });
-
-  allItems = (res?.items || []);
-  applyFilter();
-
-  setStatus(`Ready — ${allItems.length} images (smart scroll).`);
-}
-
 async function liveStart(){
   const tab = await getActiveTab();
   tabCache = tab;
+
   const site = normalizeSite(tab.url);
   siteChipEl.innerHTML = `<strong>${site}</strong>`;
+  subtitleEl.textContent = `${site} • Live capture • JPG/PNG/WEBP • skip <200×200`;
 
   await ensureContent(tab.id);
   await chrome.tabs.sendMessage(tab.id, { type:"LIVE_START", tabId: tab.id });
 
-  setStatus("Live capture ON — scroll the page, I’m collecting URLs…");
+  setStatus("Live ON — scroll the page, I’m capturing URLs…");
 }
 
 async function liveStop(){
   const tab = await getActiveTab();
   tabCache = tab;
+
   await ensureContent(tab.id);
   await chrome.tabs.sendMessage(tab.id, { type:"LIVE_STOP" });
-  setStatus("Live capture OFF.");
+
+  setStatus("Live OFF.");
 }
 
 async function buildPreviewFromCaptured(){
-  setStatus("Loading captured list…");
+  setStatus("Loading captured URLs…");
   renderSkeletons();
 
   const tab = await getActiveTab();
   tabCache = tab;
+
   const site = normalizeSite(tab.url);
   siteChipEl.innerHTML = `<strong>${site}</strong>`;
   subtitleEl.textContent = `${site} • Captured URLs • verifying >=200×200…`;
 
-  // Get captured URLs from background
   const cap = await chrome.runtime.sendMessage({ type:"CAPTURE_GET", tabId: tab.id });
   const urls = cap?.urls || [];
 
@@ -260,7 +216,6 @@ async function buildPreviewFromCaptured(){
 
   await ensureContent(tab.id);
 
-  // Verify/filter in content script (>=200×200)
   const res = await chrome.tabs.sendMessage(tab.id, {
     type: "VERIFY_CAPTURED_URLS",
     urls,
@@ -275,7 +230,12 @@ async function buildPreviewFromCaptured(){
 
 async function clearCaptured(){
   const tab = await getActiveTab();
+  tabCache = tab;
+
   await chrome.runtime.sendMessage({ type:"CAPTURE_CLEAR", tabId: tab.id });
+  allItems = [];
+  viewItems = [];
+  renderEmpty("Captured list cleared. Press Live ON and scroll.");
   setStatus("Captured list cleared.");
 }
 
@@ -297,10 +257,7 @@ async function download(urls){
   setStatus(`Started ${urls.length} downloads.`);
 }
 
-// Wire up buttons
-btnRefresh.addEventListener("click", () => refreshScan().catch(e => setStatus("Error: " + (e?.message || e))));
-btnSmartScrollScan.addEventListener("click", () => smartScrollThenScan().catch(e => setStatus("Error: " + (e?.message || e))));
-
+// Buttons
 btnLiveStart.addEventListener("click", () => liveStart().catch(e => setStatus("Error: " + (e?.message || e))));
 btnLiveStop.addEventListener("click", () => liveStop().catch(e => setStatus("Error: " + (e?.message || e))));
 btnCapturedPreview.addEventListener("click", () => buildPreviewFromCaptured().catch(e => setStatus("Error: " + (e?.message || e))));
@@ -316,5 +273,6 @@ btnDownloadAll2.addEventListener("click", () => download(allItems.map(x=>x.url))
 
 searchEl.addEventListener("input", () => applyFilter());
 
-// On open, do a normal scan
-refreshScan().catch(e => setStatus("Error: " + (e?.message || e)));
+// Start with an empty state (no auto scan)
+renderEmpty("Press Live ON and scroll, then Build Preview (Captured).");
+setStatus("Live mode ready. Press Live ON and scroll.");
