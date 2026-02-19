@@ -1,8 +1,3 @@
-
-(() => {
-  if (window.__SID_CONTENT_LOADED__) return;
-  window.__SID_CONTENT_LOADED__ = true;
-
 const MIN_W = 400;
 const MIN_H = 400;
 
@@ -258,4 +253,3 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
-  })();
