@@ -1,6 +1,5 @@
-// content.js
 (() => {
-  // Prevent multiple injections from redeclaring const/let
+  // Prevent multiple injections (avoids: Identifier 'MIN_W' has already been declared)
   if (window.__SID_CONTENT_LOADED__) return;
   window.__SID_CONTENT_LOADED__ = true;
 
@@ -247,7 +246,7 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const t = msg?.type;
 
-    // Let popup detect if content script is already alive (prevents reinject)
+    // Allows popup to detect if content.js is already present
     if (t === "PING") {
       sendResponse({ ok: true, loaded: true });
       return true;
