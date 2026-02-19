@@ -1,61 +1,20 @@
-const statusEl = document.getElementById("status");
 const listEl = document.getElementById("list");
+const searchEl = document.getElementById("search");
+const statusTextEl = document.getElementById("statusText");
+const countPillEl = document.getElementById("countPill");
+const domainPillEl = document.getElementById("domainPill");
+
 const btnRefresh = document.getElementById("refresh");
 const btnSelectAll = document.getElementById("selectAll");
 const btnSelectNone = document.getElementById("selectNone");
 const btnDownloadSelected = document.getElementById("downloadSelected");
 const btnDownloadAll = document.getElementById("downloadAll");
 
-let items = []; // {url, w, h, mimeGuess}
+let allItems = [];     // full set from scan
+let viewItems = [];    // after search filter
 
-function setStatus(msg) {
-  statusEl.textContent = msg;
-}
-
-function render() {
-  listEl.innerHTML = "";
-  if (!items.length) {
-    listEl.innerHTML = `<div style="padding:10px; font-size:13px;">No images found (or all were filtered out). Try scrolling and Refresh.</div>`;
-    return;
-  }
-
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const row = document.createElement("div");
-    row.className = "item";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = true;
-    cb.dataset.idx = String(i);
-
-    const img = document.createElement("img");
-    img.className = "thumb";
-    img.src = it.url;
-
-    const meta = document.createElement("div");
-    meta.className = "meta";
-
-    const dim = document.createElement("div");
-    dim.className = "dim";
-    dim.textContent = `${it.w}×${it.h}`;
-
-    const url = document.createElement("div");
-    url.className = "url";
-    url.textContent = it.url;
-
-    meta.appendChild(dim);
-    meta.appendChild(url);
-
-    row.appendChild(cb);
-    row.appendChild(img);
-    row.appendChild(meta);
-
-    listEl.appendChild(row);
-  }
-
-  setStatus(`Found ${items.length} images (>=200x200, JPG/PNG/WEBP).`);
-}
+function setStatus(msg) { statusTextEl.textContent = msg; }
+function setCount(n) { countPillEl.textContent = String(n); }
 
 function getSelectedUrls() {
   const selected = [];
@@ -63,10 +22,85 @@ function getSelectedUrls() {
   for (const cb of checks) {
     if (cb.checked) {
       const idx = Number(cb.dataset.idx);
-      if (items[idx]) selected.push(items[idx].url);
+      const it = viewItems[idx];
+      if (it?.url) selected.push(it.url);
     }
   }
   return selected;
+}
+
+function render() {
+  listEl.innerHTML = "";
+
+  if (!viewItems.length) {
+    listEl.className = "";
+    listEl.innerHTML = `
+      <div class="empty">
+        No images found (or all filtered out).<br/>
+        Try scrolling the page and press <b>Refresh</b>.
+      </div>`;
+    setCount(0);
+    return;
+  }
+
+  listEl.className = "grid";
+  setCount(viewItems.length);
+
+  viewItems.forEach((it, idx) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "chk";
+    cb.checked = true;
+    cb.dataset.idx = String(idx);
+
+    const wrap = document.createElement("div");
+    wrap.className = "thumbWrap";
+
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.src = it.url;
+
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = `${it.w}×${it.h}`;
+
+    wrap.appendChild(img);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    const dim = document.createElement("div");
+    dim.className = "dim";
+    dim.textContent = it.mimeGuess ? it.mimeGuess.replace("image/", "").toUpperCase() : "IMG";
+
+    meta.appendChild(dim);
+
+    card.appendChild(cb);
+    card.appendChild(wrap);
+    card.appendChild(badge);
+    card.appendChild(meta);
+
+    // Click card to toggle selection
+    card.addEventListener("click", (e) => {
+      if (e.target.tagName.toLowerCase() === "input") return;
+      cb.checked = !cb.checked;
+    });
+
+    listEl.appendChild(card);
+  });
+}
+
+function applyFilter() {
+  const q = (searchEl.value || "").trim().toLowerCase();
+  if (!q) {
+    viewItems = allItems.slice();
+  } else {
+    viewItems = allItems.filter(it => (it.url || "").toLowerCase().includes(q));
+  }
+  render();
 }
 
 async function getActiveTab() {
@@ -76,28 +110,33 @@ async function getActiveTab() {
 }
 
 async function refresh() {
+  setStatus("Scanning…");
+  listEl.innerHTML = `<div class="empty">Scanning…</div>`;
+  setCount(0);
+
+  const tab = await getActiveTab();
+
+  // Update domain pill
   try {
-    setStatus("Scanning page…");
-    listEl.innerHTML = `<div style="padding:10px; font-size:13px;">Scanning…</div>`;
-
-    const tab = await getActiveTab();
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"]
-    });
-
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "COLLECT_SOCIAL_IMAGES" });
-    items = (res?.items || []);
-
-    render();
-  } catch (e) {
-    setStatus("Error: " + (e?.message || e));
-    listEl.innerHTML = `<div style="padding:10px; font-size:13px;">Error. Open FB/IG tab and try again.</div>`;
+    const host = new URL(tab.url).hostname;
+    domainPillEl.textContent = host.includes("instagram") ? "Instagram" : "Facebook";
+  } catch {
+    domainPillEl.textContent = "FB/IG";
   }
+
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ["content.js"]
+  });
+
+  const res = await chrome.tabs.sendMessage(tab.id, { type: "COLLECT_SOCIAL_IMAGES" });
+  allItems = (res?.items || []);
+  applyFilter();
+
+  setStatus(`Ready — ${allItems.length} images.`);
 }
 
-btnRefresh.addEventListener("click", refresh);
+btnRefresh.addEventListener("click", () => refresh().catch(e => setStatus("Error: " + (e?.message || e))));
 
 btnSelectAll.addEventListener("click", () => {
   const checks = listEl.querySelectorAll('input[type="checkbox"][data-idx]');
@@ -114,7 +153,6 @@ btnDownloadSelected.addEventListener("click", async () => {
     const tab = await getActiveTab();
     const urls = getSelectedUrls();
     if (!urls.length) return setStatus("Nothing selected.");
-
     setStatus(`Downloading ${urls.length} selected…`);
     await chrome.runtime.sendMessage({ type: "DOWNLOAD_URLS", tabId: tab.id, urls });
     setStatus(`Started ${urls.length} downloads.`);
@@ -126,15 +164,16 @@ btnDownloadSelected.addEventListener("click", async () => {
 btnDownloadAll.addEventListener("click", async () => {
   try {
     const tab = await getActiveTab();
-    if (!items.length) return setStatus("No images to download.");
-    setStatus(`Downloading ${items.length} images…`);
-    await chrome.runtime.sendMessage({ type: "DOWNLOAD_URLS", tabId: tab.id, urls: items.map(x => x.url) });
-    setStatus(`Started ${items.length} downloads.`);
+    if (!allItems.length) return setStatus("No images.");
+    setStatus(`Downloading ${allItems.length}…`);
+    await chrome.runtime.sendMessage({ type: "DOWNLOAD_URLS", tabId: tab.id, urls: allItems.map(x => x.url) });
+    setStatus(`Started ${allItems.length} downloads.`);
   } catch (e) {
     setStatus("Error: " + (e?.message || e));
   }
 });
 
-// auto scan when popup opens
-refresh();
+searchEl.addEventListener("input", () => applyFilter());
 
+// auto scan on open
+refresh().catch(e => setStatus("Error: " + (e?.message || e)));
