@@ -5,194 +5,402 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
-      --bg:#0b0f19;
-      --panel:#121a2b;
-      --card:#0f1626;
-      --border:rgba(255,255,255,.08);
+      --bg0:#05070e;
+      --bg1:#0a0f1f;
+      --glass:rgba(255,255,255,.06);
+      --glass2:rgba(255,255,255,.035);
+      --border:rgba(255,255,255,.10);
+      --border2:rgba(255,255,255,.07);
       --text:rgba(255,255,255,.92);
-      --muted:rgba(255,255,255,.65);
+      --muted:rgba(255,255,255,.64);
       --muted2:rgba(255,255,255,.45);
+      --shadow: 0 14px 40px rgba(0,0,0,.55);
       --accent:#5aa7ff;
       --accent2:#7c5cff;
-      --danger:#ff5a6f;
-      --ok:#35d07f;
-      --radius:14px;
+      --ok:#2fe08a;
+      --danger:#ff5b72;
+      --r:16px;
     }
+
     *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; }
     body{
-      margin:0;
-      width:420px;
-      background:linear-gradient(180deg,#0b0f19,#070a11);
-      color:var(--text);
+      width: 460px;
+      color: var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:
+        radial-gradient(900px 520px at 20% 0%, rgba(90,167,255,.22), transparent 55%),
+        radial-gradient(780px 480px at 90% 15%, rgba(124,92,255,.18), transparent 58%),
+        radial-gradient(700px 420px at 50% 120%, rgba(47,224,138,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
     }
+
+    /* Header */
     header{
-      padding:12px 12px 10px;
-      position:sticky; top:0;
-      background:linear-gradient(180deg,#0b0f19 50%, rgba(11,15,25,.75));
-      backdrop-filter: blur(10px);
-      border-bottom:1px solid var(--border);
-      z-index:10;
+      position: sticky;
+      top:0;
+      z-index: 50;
+      padding: 12px 12px 10px;
+      background: linear-gradient(180deg, rgba(10,15,31,.92), rgba(5,7,14,.55));
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border2);
     }
-    .title{
-      display:flex; align-items:center; justify-content:space-between;
+
+    .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
       gap:10px;
       margin-bottom:10px;
     }
-    .title strong{
-      font-size:14px; letter-spacing:.2px;
-      display:flex; align-items:center; gap:8px;
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
     }
-    .pill{
-      font-size:11px;
-      padding:4px 8px;
-      border:1px solid var(--border);
-      border-radius:999px;
-      color:var(--muted);
-      background:rgba(255,255,255,.03);
+
+    .logo{
+      width:34px;
+      height:34px;
+      border-radius: 12px;
+      background:
+        radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,.22), transparent 55%),
+        linear-gradient(135deg, rgba(90,167,255,.45), rgba(124,92,255,.32));
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 10px 26px rgba(0,0,0,.35);
+      flex:0 0 auto;
     }
+
+    .titleWrap{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+
+    .title{
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: .2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+    }
+
+    .subtitle{
+      font-size: 11px;
+      color: var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chips{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex:0 0 auto;
+    }
+
+    .chip{
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border:1px solid var(--border2);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+    }
+
+    .chip strong{ color: var(--text); }
+
+    /* Controls */
     .controls{
       display:grid;
-      grid-template-columns: 1fr;
       gap:8px;
     }
-    .row{
-      display:flex; gap:8px; flex-wrap:wrap;
+
+    .searchRow{
+      display:flex;
+      gap:8px;
+      align-items:center;
     }
+
+    .search{
+      flex:1;
+      position:relative;
+    }
+
     input[type="text"]{
       width:100%;
-      padding:9px 10px;
-      border-radius:12px;
-      border:1px solid var(--border);
-      background:rgba(255,255,255,.03);
-      color:var(--text);
+      padding: 10px 12px 10px 34px;
+      border-radius: 14px;
+      border:1px solid var(--border2);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
       outline:none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
     }
-    input[type="text"]::placeholder{ color:var(--muted2); }
+
+    input[type="text"]::placeholder{ color: var(--muted2); }
+
+    .searchIcon{
+      position:absolute;
+      left:12px;
+      top:50%;
+      transform: translateY(-50%);
+      opacity:.55;
+      font-size: 12px;
+      pointer-events:none;
+    }
+
+    .btnRow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
     button{
-      border:1px solid var(--border);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      padding:9px 10px;
-      border-radius:12px;
+      border:1px solid var(--border2);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding: 9px 10px;
+      border-radius: 14px;
       cursor:pointer;
-      font-weight:600;
-      font-size:12px;
-      transition: transform .05s ease, background .15s ease, border .15s ease;
+      font-weight: 800;
+      font-size: 12px;
+      transition: transform .05s ease, background .15s ease, border .15s ease, box-shadow .15s ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,.22);
     }
-    button:hover{ background:rgba(255,255,255,.07); }
+    button:hover{
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.12);
+    }
     button:active{ transform: translateY(1px); }
+
     button.primary{
-      background:linear-gradient(135deg, rgba(90,167,255,.22), rgba(124,92,255,.18));
-      border-color:rgba(90,167,255,.35);
+      background: linear-gradient(135deg, rgba(90,167,255,.26), rgba(124,92,255,.18));
+      border-color: rgba(90,167,255,.25);
     }
     button.primary:hover{
-      background:linear-gradient(135deg, rgba(90,167,255,.28), rgba(124,92,255,.22));
+      background: linear-gradient(135deg, rgba(90,167,255,.33), rgba(124,92,255,.22));
+      box-shadow: 0 14px 32px rgba(0,0,0,.35);
     }
-    button.danger{
-      border-color:rgba(255,90,111,.35);
-      background:rgba(255,90,111,.10);
+
+    button.ghost{
+      background: transparent;
+      box-shadow:none;
     }
-    #status{
-      margin-top:8px;
-      font-size:12px;
-      color:var(--muted);
-      display:flex; align-items:center; justify-content:space-between;
-      gap:8px;
+
+    .statusRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:2px;
     }
-    .hint{
-      font-size:11px;
-      color:var(--muted2);
-      padding:10px 12px;
+
+    .status{
+      font-size: 12px;
+      color: var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
     }
-    main{
-      padding:12px;
+
+    .counter{
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border:1px solid var(--border2);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      display:flex;
+      gap:6px;
+      align-items:center;
+      flex:0 0 auto;
     }
+
+    .dot{
+      width:8px; height:8px;
+      border-radius:999px;
+      background: rgba(255,255,255,.22);
+      box-shadow: 0 0 0 3px rgba(255,255,255,.06);
+    }
+
+    /* Main */
+    main{ padding: 12px; }
+
     .grid{
       display:grid;
       grid-template-columns: repeat(4, 1fr);
-      gap:10px;
+      gap: 10px;
     }
+
+    .empty{
+      padding: 18px 14px;
+      border-radius: var(--r);
+      border: 1px dashed rgba(255,255,255,.14);
+      background: rgba(255,255,255,.02);
+      color: var(--muted);
+      text-align:center;
+    }
+
+    /* Card */
     .card{
-      background:rgba(255,255,255,.03);
-      border:1px solid var(--border);
-      border-radius:var(--radius);
-      overflow:hidden;
       position:relative;
+      border-radius: 18px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.02);
+      box-shadow: var(--shadow);
+      cursor:pointer;
+      user-select:none;
     }
+
     .thumbWrap{
-      aspect-ratio:1/1;
-      background:rgba(255,255,255,.03);
-      display:flex; align-items:center; justify-content:center;
+      aspect-ratio: 1 / 1;
+      background: rgba(255,255,255,.03);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
+
     .thumb{
-      width:100%; height:100%;
+      width:100%;
+      height:100%;
       object-fit:cover;
+      transform: scale(1.0);
+      transition: transform .18s ease, filter .18s ease;
       display:block;
     }
-    .meta{
-      padding:8px 9px 9px;
-      display:flex; align-items:center; justify-content:space-between;
-      gap:8px;
-      border-top:1px solid rgba(255,255,255,.06);
+
+    .card:hover .thumb{
+      transform: scale(1.05);
+      filter: saturate(1.08) contrast(1.04);
     }
-    .dim{
-      font-size:11px;
-      color:var(--muted);
+
+    .overlay{
+      position:absolute;
+      inset:0;
+      background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.35));
+      opacity: 0;
+      transition: opacity .18s ease;
+      pointer-events:none;
+    }
+
+    .card:hover .overlay{ opacity: 1; }
+
+    .meta{
+      position:absolute;
+      left:8px;
+      right:8px;
+      bottom:8px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      pointer-events:none;
+    }
+
+    .badge{
+      font-size: 10px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.15);
+      background: rgba(0,0,0,.38);
+      color: rgba(255,255,255,.88);
+      backdrop-filter: blur(8px);
       white-space:nowrap;
     }
-    .chk{
+
+    .check{
+      pointer-events:auto;
       position:absolute;
       top:8px; left:8px;
       width:18px; height:18px;
       accent-color: var(--accent);
-      filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,.45));
     }
-    .badge{
+
+    .selGlow{
       position:absolute;
-      bottom:8px; right:8px;
-      font-size:10px;
-      padding:3px 6px;
-      border-radius:999px;
-      background:rgba(0,0,0,.45);
-      border:1px solid rgba(255,255,255,.12);
-      color:rgba(255,255,255,.85);
-      backdrop-filter: blur(6px);
+      inset:-2px;
+      border-radius: 20px;
+      border: 2px solid rgba(90,167,255,.0);
+      box-shadow: 0 0 0 rgba(0,0,0,0);
+      transition: border-color .18s ease, box-shadow .18s ease;
+      pointer-events:none;
     }
-    .empty{
-      padding:18px 12px;
-      border:1px dashed var(--border);
-      border-radius:var(--radius);
-      color:var(--muted);
-      text-align:center;
-      background:rgba(255,255,255,.02);
+
+    .card.selected .selGlow{
+      border-color: rgba(90,167,255,.65);
+      box-shadow: 0 0 0 6px rgba(90,167,255,.14);
     }
-    .footerRow{
+
+    /* Footer actions */
+    .footer{
       display:flex;
       gap:8px;
-      margin-top:12px;
+      margin-top: 12px;
+      position:sticky;
+      bottom:0;
+      padding: 10px 0 2px;
+      background: linear-gradient(180deg, rgba(5,7,14,0), rgba(5,7,14,.88));
+      backdrop-filter: blur(10px);
     }
-    .footerRow button{ flex:1; }
+    .footer button{ flex:1; }
+
+    .note{
+      font-size: 11px;
+      color: var(--muted2);
+      padding: 10px 2px 0;
+      line-height: 1.35;
+    }
   </style>
 </head>
 
 <body>
   <header>
-    <div class="title">
-      <strong>📥 Social Image Downloader</strong>
-      <span class="pill" id="domainPill">FB/IG</span>
+    <div class="top">
+      <div class="brand">
+        <div class="logo"></div>
+        <div class="titleWrap">
+          <div class="title">Social Image Downloader</div>
+          <div class="subtitle" id="subtitle">FB/IG • JPG/PNG/WEBP • skip &lt;200×200</div>
+        </div>
+      </div>
+      <div class="chips">
+        <div class="chip" id="siteChip"><strong>—</strong></div>
+      </div>
     </div>
 
     <div class="controls">
-      <input id="search" type="text" placeholder="Filter by URL (optional)..." />
-      <div class="row">
-        <button id="refresh">Refresh</button>
+      <div class="searchRow">
+        <div class="search">
+          <div class="searchIcon">⌕</div>
+          <input id="search" type="text" placeholder="Filter by URL (optional)..." />
+        </div>
+        <button class="ghost" id="refresh" title="Refresh">↻</button>
+      </div>
+
+      <div class="btnRow">
         <button id="selectAll">Select all</button>
         <button id="selectNone">Select none</button>
+        <button class="primary" id="downloadSelected">Download selected</button>
+        <button id="downloadAll">Download all</button>
       </div>
-      <div id="status">
-        <span id="statusText">Ready.</span>
-        <span class="pill" id="countPill">0</span>
+
+      <div class="statusRow">
+        <div class="status" id="statusText">Ready.</div>
+        <div class="counter" title="Shown / Selected">
+          <span class="dot"></span>
+          <span id="countPill">0</span>
+          <span style="opacity:.55">/</span>
+          <span id="selPill">0</span>
+        </div>
       </div>
     </div>
   </header>
@@ -200,13 +408,14 @@
   <main>
     <div id="list" class="grid"></div>
 
-    <div class="footerRow">
-      <button class="primary" id="downloadSelected">Download selected</button>
-      <button id="downloadAll">Download all</button>
+    <div class="footer">
+      <button class="primary" id="downloadSelected2">Download selected</button>
+      <button id="downloadAll2">Download all</button>
     </div>
 
-    <div class="hint">
-      Scroll FB/IG to load more images, then press <b>Refresh</b>. Filters: JPG/PNG/WEBP, skip &lt;200×200.
+    <div class="note">
+      Tip: FB/IG load content dynamically. Scroll to load more images, then hit refresh ↻.
+      (Some images may still be blocked by the site.)
     </div>
   </main>
 
