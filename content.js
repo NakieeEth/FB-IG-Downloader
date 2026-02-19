@@ -1,6 +1,17 @@
 const MIN_W = 200;
 const MIN_H = 200;
 
+async function autoScroll(times = 10, stepPx = 900, delayMs = 650) {
+  // Smooth-ish incremental scroll so FB/IG loads content
+  for (let i = 0; i < times; i++) {
+    window.scrollBy({ top: stepPx, left: 0, behavior: "smooth" });
+    await new Promise(r => setTimeout(r, delayMs));
+
+    // Extra tiny delay helps when network is slow
+    await new Promise(r => setTimeout(r, 150));
+  }
+}
+
 function toAbs(url) {
   try { return new URL(url, location.href).href; } catch { return null; }
 }
