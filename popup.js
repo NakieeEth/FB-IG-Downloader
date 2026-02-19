@@ -34,6 +34,9 @@ const MODES = ["auto", "zip", "files"];
 const ZIP_THRESHOLD = 50; // ✅ auto-switch to ZIP when >= 50
 let dlMode = "auto";
 
+// ✅ UPDATED verify limit
+const MAX_VERIFY = 1000;
+
 function toast(msg){
   toastEl.textContent = msg;
   toastEl.classList.add("show");
@@ -238,7 +241,7 @@ async function liveToggle(){
 
   const site = normalizeSite(tab.url);
   siteNameEl.textContent = site;
-  subtitleEl.textContent = `${site} • Live capture • JPG/PNG/WEBP • skip <400×400`;
+  subtitleEl.textContent = `${site} • Live capture • JPG/PNG/WEBP • skip <300×300`;
 
   await ensureContent(tab.id);
 
@@ -284,12 +287,12 @@ async function buildPreview(){
   const res = await chrome.tabs.sendMessage(tab.id, {
     type: "VERIFY_CAPTURED_URLS",
     urls,
-    maxVerify: 1000
+    maxVerify: MAX_VERIFY // ✅ 1000
   });
 
   allItems = (res?.items || []);
   render();
-  setStatus(`Ready — ${allItems.length} images (>=400×400).`);
+  setStatus(`Ready — ${allItems.length} images (>=300×300).`);
   toast(`Preview: ${allItems.length}`);
 }
 
@@ -385,11 +388,10 @@ async function buildZipFromUrls(urls, folderName){
   for (let i=0;i<unique.length;i++){
     const url = unique[i];
     const ext = guessExt(url);
-    const name = `${folder}/img_${String(i+1).padStart(4,"0")}.${ext}`;
+    const name = `${folder}/img_${String(i+1).padStart(5,"0")}.${ext}`;
     const data = await fetchAsBytes(url);
     files.push({ name, data });
 
-    // Yield a bit to keep UI responsive
     if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
   }
 
@@ -407,7 +409,7 @@ async function buildZipFromUrls(urls, folderName){
       u32(0x04034b50),
       u16(20),
       u16(0),
-      u16(0),              // STORE (no compression)
+      u16(0),              // STORE
       u16(now.time),
       u16(now.date),
       u32(crc),
