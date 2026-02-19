@@ -284,7 +284,7 @@ async function buildPreview(){
   const res = await chrome.tabs.sendMessage(tab.id, {
     type: "VERIFY_CAPTURED_URLS",
     urls,
-    maxVerify: 260
+    maxVerify: 1000
   });
 
   allItems = (res?.items || []);
