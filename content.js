@@ -3,9 +3,11 @@
   if (window.__SID_CONTENT_LOADED__) return;
   window.__SID_CONTENT_LOADED__ = true;
 
-  // ✅ UPDATED LIMITS
+  // ✅ Keep 300×300
   const MIN_W = 300;
   const MIN_H = 300;
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
   function toAbs(url) {
     try { return new URL(url, location.href).href; } catch { return null; }
@@ -178,6 +180,37 @@
     showBadge(false);
   }
 
+  // ===== Instagram carousel scan =====
+  function isLikelyNextLabel(label) {
+    const s = (label || "").toLowerCase();
+    return /next|go to next|suivant|weiter|次|下一|다음|tiếp|avan[çc]ar|proximo|próximo|بالتالي|التالي|หลังจากนี้|បន្ទាប់/.test(s);
+  }
+
+  function findNextButtons() {
+    const btns = Array.from(document.querySelectorAll('button[aria-label], div[role="button"][aria-label]'));
+    return btns.filter(b => isLikelyNextLabel(b.getAttribute("aria-label")));
+  }
+
+  async function scanInstagramCarousel(tabId, steps = 20, delayMs = 650) {
+    let clicked = 0;
+
+    for (let i = 0; i < steps; i++) {
+      const nextButtons = findNextButtons();
+      if (!nextButtons.length) break;
+
+      const btn = nextButtons[nextButtons.length - 1];
+      try { btn.click(); } catch { break; }
+
+      clicked++;
+      await sleep(delayMs);
+
+      // capture newly loaded slide images
+      try { await sendCapturedBatch(tabId); } catch {}
+    }
+
+    return clicked;
+  }
+
   // ===== Verify captured URLs into preview items (>= MIN) =====
   function measureUrl(url) {
     return new Promise(resolve => {
@@ -261,6 +294,16 @@
     if (t === "LIVE_STOP") {
       stopLive();
       sendResponse({ ok: true });
+      return true;
+    }
+
+    if (t === "IG_CAROUSEL_SCAN") {
+      (async () => {
+        const steps = Number(msg.steps ?? 20);
+        const delayMs = Number(msg.delayMs ?? 650);
+        const n = await scanInstagramCarousel(msg.tabId, steps, delayMs);
+        sendResponse({ ok: true, clicked: n });
+      })();
       return true;
     }
 
