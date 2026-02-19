@@ -126,11 +126,28 @@ async function buildFilteredList() {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === "COLLECT_SOCIAL_IMAGES") {
+  const t = msg?.type;
+
+  if (t === "COLLECT_SOCIAL_IMAGES") {
     (async () => {
       const res = await buildFilteredList();
       sendResponse(res);
     })();
     return true;
   }
+
+  if (t === "AUTO_SCROLL_AND_COLLECT") {
+    (async () => {
+      const times = Number(msg.times ?? 10);
+      const stepPx = Number(msg.stepPx ?? 900);
+      const delayMs = Number(msg.delayMs ?? 650);
+
+      await autoScroll(times, stepPx, delayMs);
+
+      const res = await buildFilteredList();
+      sendResponse(res);
+    })();
+    return true;
+  }
 });
+
