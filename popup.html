@@ -1,206 +1,130 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root{
-      --bg0:#05070e;
-      --bg1:#0a0f1f;
-      --border2:rgba(255,255,255,.07);
-      --text:rgba(255,255,255,.92);
-      --muted:rgba(255,255,255,.64);
-      --muted2:rgba(255,255,255,.45);
-      --shadow: 0 14px 40px rgba(0,0,0,.55);
-      --accent:#5aa7ff;
-      --r:16px;
-    }
-    *{ box-sizing:border-box; }
-    html,body{ margin:0; padding:0; }
-    body{
-      width: 520px;
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background:
-        radial-gradient(900px 520px at 20% 0%, rgba(90,167,255,.22), transparent 55%),
-        radial-gradient(780px 480px at 90% 15%, rgba(124,92,255,.18), transparent 58%),
-        radial-gradient(700px 420px at 50% 120%, rgba(47,224,138,.10), transparent 60%),
-        linear-gradient(180deg, var(--bg1), var(--bg0));
-    }
-    @keyframes popIn { from { opacity:0; transform: translateY(8px) scale(.985);} to { opacity:1; transform: translateY(0) scale(1);} }
-    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{
+  --bg0:#05070e;
+  --bg1:#0a0f1f;
+  --border2:rgba(255,255,255,.07);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.64);
+  --accent:#5aa7ff;
+}
+body{
+  margin:0;
+  width:520px;
+  font-family:system-ui;
+  color:var(--text);
+  background:linear-gradient(180deg,var(--bg1),var(--bg0));
+}
 
-    header{
-      position: sticky; top:0; z-index: 50;
-      padding: 12px 12px 10px;
-      background: linear-gradient(180deg, rgba(10,15,31,.92), rgba(5,7,14,.55));
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border2);
-    }
-    .top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-    .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
-    .logo{
-      width:36px;height:36px;border-radius:14px;
-      background: radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,.22), transparent 55%),
-                  linear-gradient(135deg, rgba(90,167,255,.48), rgba(124,92,255,.32));
-      border:1px solid rgba(255,255,255,.14);
-      box-shadow: 0 12px 30px rgba(0,0,0,.38);
-      flex:0 0 auto;
-    }
-    .titleWrap{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .title{ font-weight: 900; font-size: 13px; letter-spacing: .25px; white-space:nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .subtitle{ font-size: 11px; color: var(--muted); white-space:nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .chip{
-      font-size: 11px; padding: 6px 10px; border-radius: 999px;
-      border:1px solid var(--border2); background: rgba(255,255,255,.03);
-      color: var(--muted); flex:0 0 auto;
-    }
-    .chip strong{ color: var(--text); }
+header{
+  padding:12px;
+  border-bottom:1px solid var(--border2);
+}
 
-    .controls{ display:grid; gap:8px; }
-    .searchRow{ display:flex; gap:8px; align-items:center; }
-    .search{ flex:1; position:relative; }
-    input[type="text"]{
-      width:100%; padding: 10px 12px 10px 34px;
-      border-radius: 14px; border:1px solid var(--border2);
-      background: rgba(255,255,255,.03); color: var(--text);
-      outline:none;
-    }
-    input[type="text"]::placeholder{ color: var(--muted2); }
-    .searchIcon{ position:absolute; left:12px; top:50%; transform: translateY(-50%); opacity:.55; font-size: 12px; pointer-events:none; }
+.title{
+  font-weight:900;
+  font-size:14px;
+}
 
-    .btnRow{ display:flex; gap:8px; flex-wrap:wrap; }
-    button{
-      border:1px solid var(--border2);
-      background: rgba(255,255,255,.03);
-      color: var(--text);
-      padding: 9px 10px;
-      border-radius: 14px;
-      cursor:pointer;
-      font-weight: 900;
-      font-size: 12px;
-      transition: transform .06s ease, background .15s ease, border .15s ease, box-shadow .15s ease;
-      box-shadow: 0 10px 22px rgba(0,0,0,.24);
-      user-select:none;
-    }
-    button:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); box-shadow: 0 14px 30px rgba(0,0,0,.32); }
-    button:active{ transform: translateY(1px) scale(.995); }
-    button.primary{ background: linear-gradient(135deg, rgba(90,167,255,.30), rgba(124,92,255,.18)); border-color: rgba(90,167,255,.28); }
+.subtitle{
+  font-size:11px;
+  color:var(--muted);
+}
 
-    .statusRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:2px; }
-    .status{ font-size: 12px; color: var(--muted); white-space:nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .counter{
-      font-size: 11px; padding: 6px 10px; border-radius: 999px;
-      border:1px solid var(--border2); background: rgba(255,255,255,.03);
-      color: var(--muted); display:flex; gap:7px; align-items:center; flex:0 0 auto;
-    }
-    .dot{ width:8px;height:8px;border-radius:999px;background: rgba(255,255,255,.22); box-shadow: 0 0 0 3px rgba(255,255,255,.06); }
+.btnRow{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
 
-    main{ padding: 12px; }
-    .grid{ display:grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+button{
+  border:1px solid var(--border2);
+  background:rgba(255,255,255,.05);
+  color:white;
+  padding:9px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:800;
+  font-size:12px;
+}
 
-    .card{
-      position:relative; border-radius: 18px; overflow:hidden;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.02);
-      box-shadow: var(--shadow);
-      cursor:pointer; user-select:none;
-      animation: popIn .18s ease both;
-      animation-delay: calc(var(--i, 0) * 10ms);
-    }
-    .thumbWrap{ aspect-ratio: 1 / 1; background: rgba(255,255,255,.03); overflow:hidden; display:flex; align-items:center; justify-content:center; position:relative; }
-    .thumb{ width:100%; height:100%; object-fit:cover; transform: scale(1.0); transition: transform .18s ease, filter .18s ease; display:block; }
-    .card:hover .thumb{ transform: scale(1.06); filter: saturate(1.08) contrast(1.05); }
-    .overlay{ position:absolute; inset:0; background: linear-gradient(180deg, rgba(0,0,0,.00), rgba(0,0,0,.40)); opacity: 0; transition: opacity .18s ease; pointer-events:none; }
-    .card:hover .overlay{ opacity: 1; }
-    .meta{ position:absolute; left:8px; right:8px; bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; pointer-events:none; }
-    .badge{ font-size: 10px; padding: 4px 7px; border-radius: 999px; border:1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.40); color: rgba(255,255,255,.88); backdrop-filter: blur(8px); white-space:nowrap; }
-    .check{ pointer-events:auto; position:absolute; top:8px; left:8px; width:18px; height:18px; accent-color: var(--accent); filter: drop-shadow(0 3px 10px rgba(0,0,0,.45)); }
-    .selGlow{ position:absolute; inset:-2px; border-radius: 20px; border: 2px solid rgba(90,167,255,.0); box-shadow: 0 0 0 rgba(0,0,0,0); transition: border-color .18s ease, box-shadow .18s ease; pointer-events:none; }
-    .card.selected .selGlow{ border-color: rgba(90,167,255,.70); box-shadow: 0 0 0 6px rgba(90,167,255,.14); }
+button.primary{
+  background:rgba(90,167,255,.25);
+}
 
-    .skeleton{ border-radius: 18px; border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); overflow:hidden; height: 0; padding-bottom: 100%; position:relative; }
-    .skeleton::before{
-      content:""; position:absolute; inset:0;
-      background: linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.08), rgba(255,255,255,.03));
-      background-size: 200% 100%;
-      animation: shimmer 1.1s linear infinite;
-    }
+main{ padding:12px; }
 
-    .footer{
-      display:flex; gap:8px; margin-top: 12px;
-      position:sticky; bottom:0;
-      padding: 10px 0 2px;
-      background: linear-gradient(180deg, rgba(5,7,14,0), rgba(5,7,14,.88));
-      backdrop-filter: blur(10px);
-    }
-    .footer button{ flex:1; }
+.grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+}
 
-    .note{ font-size: 11px; color: var(--muted2); padding: 10px 2px 0; line-height: 1.35; }
-    .empty{ padding: 18px 14px; border-radius: var(--r); border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.02); color: var(--muted); text-align:center; }
-  </style>
+.card{
+  position:relative;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.thumbWrap{ aspect-ratio:1/1; }
+.thumb{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.check{
+  position:absolute;
+  top:6px;
+  left:6px;
+}
+
+.footer{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+}
+
+.footer button{ flex:1; }
+
+.status{
+  margin-top:8px;
+  font-size:12px;
+  color:var(--muted);
+}
+</style>
 </head>
 
 <body>
-  <header>
-    <div class="top">
-      <div class="brand">
-        <div class="logo"></div>
-        <div class="titleWrap">
-          <div class="title">Social Image Downloader</div>
-          <div class="subtitle" id="subtitle">Live capture • JPG/PNG/WEBP • skip &lt;200×200</div>
-        </div>
-      </div>
-      <div class="chip" id="siteChip"><strong>—</strong></div>
-    </div>
+<header>
+  <div class="title">Social Image Downloader</div>
+  <div class="subtitle">Live capture • skip &lt;400×400</div>
 
-    <div class="controls">
-      <div class="searchRow">
-        <div class="search">
-          <div class="searchIcon">⌕</div>
-          <input id="search" type="text" placeholder="Filter by URL (optional)..." />
-        </div>
-      </div>
+  <div class="btnRow">
+    <button id="liveStart">Live ON</button>
+    <button id="liveStop">Live OFF</button>
+    <button class="primary" id="capturedPreview">Build Preview</button>
+    <button id="capturedClear">Clear</button>
+  </div>
+</header>
 
-      <div class="btnRow">
-        <button id="liveStart">Live ON</button>
-        <button id="liveStop">Live OFF</button>
-        <button class="primary" id="capturedPreview">Build Preview (Captured)</button>
-        <button id="capturedClear">Clear Captured</button>
-      </div>
+<main>
+  <div id="list" class="grid"></div>
 
-      <div class="btnRow">
-        <button id="selectAll">Select all</button>
-        <button id="selectNone">Select none</button>
-        <button class="primary" id="downloadSelected">Download selected</button>
-        <button id="downloadAll">Download all</button>
-      </div>
+  <div class="footer">
+    <button class="primary" id="downloadSelected">Download Selected</button>
+    <button id="downloadAll">Download All</button>
+  </div>
 
-      <div class="statusRow">
-        <div class="status" id="statusText">Live mode ready. Press Live ON and scroll.</div>
-        <div class="counter" title="Shown / Selected">
-          <span class="dot"></span>
-          <span id="countPill">0</span>
-          <span style="opacity:.55">/</span>
-          <span id="selPill">0</span>
-        </div>
-      </div>
-    </div>
-  </header>
+  <div id="statusText" class="status">Live mode ready.</div>
+</main>
 
-  <main>
-    <div id="list" class="grid"></div>
-
-    <div class="footer">
-      <button class="primary" id="downloadSelected2">Download selected</button>
-      <button id="downloadAll2">Download all</button>
-    </div>
-
-    <div class="note">
-      Workflow: <b>Live ON</b> → scroll the profile/feed → <b>Build Preview (Captured)</b> → download.
-    </div>
-  </main>
-
-  <script src="popup.js"></script>
+<script src="popup.js"></script>
 </body>
 </html>
