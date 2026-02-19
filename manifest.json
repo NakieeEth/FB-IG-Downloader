@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Social Image Downloader (FB/IG)",
-  "version": "1.0.0",
-  "description": "Preview and download JPG/PNG/WEBP images from Facebook/Instagram. Skips small images.",
+  "version": "1.2.0",
+  "description": "Beautiful gallery preview + smart scroll scan for Facebook/Instagram images (JPG/PNG/WEBP, skip small).",
   "permissions": ["downloads", "tabs", "scripting", "activeTab"],
   "host_permissions": ["https://*.facebook.com/*", "https://*.instagram.com/*"],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Download images"
+    "default_title": "Social Image Downloader"
   },
   "background": {
     "service_worker": "background.js"
