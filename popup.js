@@ -13,6 +13,8 @@ const selCountEl = document.getElementById("selCount");
 
 const btnLiveToggle = document.getElementById("liveToggle");
 const btnBuildPreview = document.getElementById("buildPreview");
+const btnAutoFetch = document.getElementById("autoFetch");
+const btnAutoStop  = document.getElementById("autoStop");
 const btnSelectAll = document.getElementById("selectAll");
 const btnSelectNone = document.getElementById("selectNone");
 const btnClearCaptured = document.getElementById("clearCaptured");
@@ -33,6 +35,12 @@ function toast(msg){
 }
 
 function setStatus(msg){ statusEl.textContent = msg; }
+
+function setAutoUi(running){
+  if (!btnAutoFetch || !btnAutoStop) return;
+  btnAutoFetch.style.display = running ? "none" : "inline-block";
+  btnAutoStop.style.display  = running ? "inline-block" : "none";
+}
 
 function normalizeSite(tabUrl){
   try{
@@ -110,6 +118,8 @@ function render(){
     const img = document.createElement("img");
     img.className = "thumb";
     img.loading = "lazy";
+    // Helps IG/CDN thumbnails render inside extension
+    img.referrerPolicy = "no-referrer";
     img.src = it.url;
 
     const meta = document.createElement("div");
@@ -229,6 +239,44 @@ async function liveToggle(){
   startPolling();
 }
 
+async function autoFetchStart(){
+  const tab = await getActiveTab();
+  tabCache = tab;
+
+  const site = normalizeSite(tab.url);
+  siteNameEl.textContent = site;
+
+  await ensureContent(tab.id);
+
+  // Make sure live is ON so carousel slides are captured as they load.
+  if (!liveOn){
+    await chrome.tabs.sendMessage(tab.id, { type:"LIVE_START", tabId: tab.id });
+    setLiveUi(true);
+    startPolling();
+  }
+
+  setAutoUi(true);
+  setStatus("Auto Fetch running — opening posts & swiping carousels…");
+  toast("Auto Fetch started");
+
+  await chrome.tabs.sendMessage(tab.id, {
+    type: "AUTO_FETCH_START",
+    tabId: tab.id,
+    maxPosts: 80,
+    maxSlides: 30
+  });
+}
+
+async function autoFetchStop(){
+  const tab = await getActiveTab();
+  tabCache = tab;
+  await ensureContent(tab.id);
+  await chrome.tabs.sendMessage(tab.id, { type: "AUTO_FETCH_STOP" });
+  setAutoUi(false);
+  setStatus("Auto Fetch stopped.");
+  toast("Stopped");
+}
+
 async function buildPreview(){
   const tab = await getActiveTab();
   tabCache = tab;
@@ -275,8 +323,8 @@ async function clearCaptured(){
     await chrome.tabs.sendMessage(tab.id, { type: "LIVE_STOP" });
   }catch{}
 
-  setLiveUi(false);         // update UI state
-  stopPolling();            // optional: stop timer for a moment
+  setLiveUi(false);
+  stopPolling();
 
   await chrome.runtime.sendMessage({ type:"CAPTURE_CLEAR", tabId: tab.id });
 
@@ -286,9 +334,8 @@ async function clearCaptured(){
   setStatus("Captured list cleared.");
   toast("Cleared");
 
-  startPolling();           // resume polling
+  startPolling();
 }
-
 
 async function download(urls){
   if (!urls.length){
@@ -311,12 +358,15 @@ async function init(){
   siteDotEl.style.background = "rgba(255,255,255,.22)";
 
   setLiveUi(false);
+  setAutoUi(false);
   render();
   startPolling();
 }
 
 btnLiveToggle.addEventListener("click", () => liveToggle().catch(e => setStatus("Error: " + (e?.message || e))));
 btnBuildPreview.addEventListener("click", () => buildPreview().catch(e => setStatus("Error: " + (e?.message || e))));
+btnAutoFetch?.addEventListener("click", () => autoFetchStart().catch(e => setStatus("Error: " + (e?.message || e))));
+btnAutoStop?.addEventListener("click", () => autoFetchStop().catch(e => setStatus("Error: " + (e?.message || e))));
 btnSelectAll.addEventListener("click", () => setAllSelection(true));
 btnSelectNone.addEventListener("click", () => setAllSelection(false));
 btnClearCaptured.addEventListener("click", () => clearCaptured().catch(e => setStatus("Error: " + (e?.message || e))));
