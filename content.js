@@ -178,6 +178,133 @@
     showBadge(false);
   }
 
+  // ===== Instagram Auto Fetch (open posts + swipe carousels) =====
+  const AUTO_KEY = "__sid_auto_fetch_state__";
+  function autoState(){
+    if (!window[AUTO_KEY]) window[AUTO_KEY] = { running:false, stop:false };
+    return window[AUTO_KEY];
+  }
+
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  function isInstagram(){
+    return location.hostname.includes("instagram.com");
+  }
+
+  function getProfilePostAnchors(){
+    // Profile grid posts are usually /p/..., reels /reel/... (we still open because some reels have cover images)
+    const as = Array.from(document.querySelectorAll('a[href^="/p/"], a[href^="/reel/"]'));
+    return as.filter(a => a.querySelector("img"));
+  }
+
+  function dialogEl(){
+    return document.querySelector('div[role="dialog"]');
+  }
+
+  function closeBtn(){
+    const dlg = dialogEl();
+    if (!dlg) return null;
+    return dlg.querySelector('button[aria-label="Close"]')
+      || dlg.querySelector('svg[aria-label="Close"]')?.closest('button')
+      || document.querySelector('button[aria-label="Close"]');
+  }
+
+  function carouselNextBtn(){
+    const dlg = dialogEl();
+    if (!dlg) return null;
+    const btn = dlg.querySelector('button[aria-label="Next"]');
+    if (!btn || btn.disabled) return null;
+    return btn;
+  }
+
+  async function waitForDialog(timeoutMs = 6500){
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs){
+      const d = dialogEl();
+      if (d) return d;
+      await sleep(120);
+    }
+    return null;
+  }
+
+  async function harvestInstagramProfile({ tabId, maxPosts = 80, maxSlides = 30 } = {}){
+    if (!isInstagram()) return;
+    const st = autoState();
+    if (st.running) return;
+    st.running = true;
+    st.stop = false;
+
+    // Ensure live capture is ON for URL collection
+    if (!liveState().on && tabId) startLive(tabId);
+
+    // Collect post hrefs while scrolling
+    const hrefs = new Set();
+    let noNewRounds = 0;
+
+    while (!st.stop && hrefs.size < maxPosts && noNewRounds < 10){
+      const before = hrefs.size;
+      for (const a of getProfilePostAnchors()){
+        const href = a.getAttribute('href');
+        if (href) hrefs.add(href);
+      }
+
+      // scroll to load more tiles
+      window.scrollBy(0, Math.round(window.innerHeight * 0.9));
+      await sleep(900);
+
+      const after = hrefs.size;
+      noNewRounds = (after === before) ? (noNewRounds + 1) : 0;
+    }
+
+    const list = Array.from(hrefs).slice(0, maxPosts);
+
+    // Open each post (modal) and swipe carousel slides
+    for (const href of list){
+      if (st.stop) break;
+
+      let a = document.querySelector(`a[href="${CSS.escape(href)}"]`);
+      if (!a){
+        window.scrollBy(0, Math.round(window.innerHeight * 0.6));
+        await sleep(400);
+        a = document.querySelector(`a[href="${CSS.escape(href)}"]`);
+      }
+      if (!a) continue;
+
+      a.scrollIntoView({ block: 'center' });
+      await sleep(180);
+      a.click();
+
+      const dlg = await waitForDialog(6500);
+      if (!dlg){
+        try { history.back(); } catch {}
+        await sleep(900);
+        continue;
+      }
+
+      // Let first slide load
+      await sleep(700);
+      if (tabId) await sendCapturedBatch(tabId).catch(()=>{});
+
+      // Swipe through carousel if Next exists
+      for (let i = 0; i < maxSlides && !st.stop; i++){
+        const next = carouselNextBtn();
+        if (!next) break;
+        next.click();
+        await sleep(650);
+        if (tabId) await sendCapturedBatch(tabId).catch(()=>{});
+      }
+
+      // Close modal
+      const c = closeBtn();
+      if (c) c.click();
+      else document.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', code:'Escape', bubbles:true }));
+      await sleep(520);
+    }
+
+    st.running = false;
+    st.stop = false;
+  }
+
   // ===== Verify captured URLs into preview items (>= MIN) =====
   function measureUrl(url) {
     return new Promise(resolve => {
@@ -271,6 +398,24 @@
         const res = await verifyCapturedStrict(urls, Number(msg.maxVerify ?? 260));
         sendResponse(res);
       })();
+      return true;
+    }
+
+    if (t === "AUTO_FETCH_START") {
+      (async () => {
+        const tabId = msg.tabId;
+        const maxPosts = Number(msg.maxPosts ?? 80);
+        const maxSlides = Number(msg.maxSlides ?? 30);
+        harvestInstagramProfile({ tabId, maxPosts, maxSlides }).catch(() => {});
+        sendResponse({ ok: true, started: true });
+      })();
+      return true;
+    }
+
+    if (t === "AUTO_FETCH_STOP") {
+      const st = autoState();
+      st.stop = true;
+      sendResponse({ ok: true, stopping: true });
       return true;
     }
   });
